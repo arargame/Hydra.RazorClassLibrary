@@ -1,0 +1,25 @@
+﻿@page "/checkboxcomponent-test"
+@using Hydra.RazorClassLibrary.Components
+
+<h4>Checkbox Test</h4>
+
+
+@* <TestElementAttributesTableComponent Debugger="@ComponentDebugger" /> *@
+
+<TestElementDisplay @ref="CheckboxComponentRef" TTypeOfHtmlElementComponent="bool" TypeOfComponent="CheckboxComponentModel" HtmlElementComponent="CheckboxComponentModel">
+</TestElementDisplay>
+
+@code {
+
+    private ComponentDebugger ComponentDebugger = new ComponentDebugger();
+
+    private CheckboxComponentModel CheckboxComponentModel = new();
+
+    private CheckboxComponent CheckboxComponentRef = new();
+
+    private Task OnCheckedChanged(bool newValue)
+    {
+        
+        return Task.CompletedTask;
+    }
+}

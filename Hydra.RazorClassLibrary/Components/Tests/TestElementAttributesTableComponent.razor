@@ -1,0 +1,64 @@
+﻿@if (Debugger != null && Debugger.Attributes.Any())
+{
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-family: Arial, sans-serif;
+            font-size: 15px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f3f3f3;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        code {
+            background-color: #f9f2f4;
+            padding: 2px 5px;
+            border-radius: 4px;
+            color: #c7254e;
+            font-family: Consolas, monospace;
+        }
+    </style>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Attribute</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Debugger != null)
+            {
+                @foreach (var kvp in Debugger.Attributes)
+                {
+                    <tr>
+                        <td>@kvp.Key</td>
+                        <td>@kvp.Value</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <div class="text-gray-500 italic">No attributes to display.</div>
+}
+
+@code {
+    [Parameter] public ComponentDebugger? Debugger { get; set; }
+}

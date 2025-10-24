@@ -1,0 +1,13 @@
+﻿<p @onclick="OnClick">@Value</p>
+
+
+@code {
+    [Parameter]
+    public string Value { get; set; } = "Hello World";
+
+    private void OnClick()
+    {
+        Value = "Clicked!";
+    }
+}
+

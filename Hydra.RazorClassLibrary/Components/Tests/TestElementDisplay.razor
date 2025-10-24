@@ -1,0 +1,47 @@
+﻿@using Hydra.RazorClassLibrary.Utils
+@typeparam TTypeOfHtmlElementComponent
+@typeparam TypeOfComponent
+
+@if(HtmlElementComponent==null)
+{
+    <p>HtmlElementComponent is null</p>
+}
+else
+{
+    <div class="container mt-3">
+        <h2>Card Header and Footer</h2>
+        <div class="card">
+
+            <div class="card-header">
+                @HtmlElementComponent.Name
+            </div>
+
+            <div class="card-body">
+               @*  <DynamicComponent Type="typeof(CheckboxComponent)" /> *@
+               @HtmlElementComponent.Content
+            </div>
+
+            <div class="card-footer">
+                <TestElementAttributesTableComponent Debugger="@HtmlElementComponent.Debugger"></TestElementAttributesTableComponent>
+            </div>
+        </div>
+    </div>
+}
+
+
+
+@code {
+    [Parameter]
+    public HtmlElementComponent<TTypeOfHtmlElementComponent> HtmlElementComponent { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var renderFragment = BlazorHelper.GetRenderFragment(type:typeof(TypeOfComponent));
+
+        HtmlElementComponent.SetContent(renderFragment);
+
+        //HtmlElementComponent.Debugger = new ComponentDebugger();
+
+        await base.OnInitializedAsync();
+    }
+}

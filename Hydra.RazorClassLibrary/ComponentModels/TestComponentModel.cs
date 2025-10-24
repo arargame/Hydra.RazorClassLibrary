@@ -16,6 +16,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             SetName("TestComponentModel");
 
             Value = "Initial Value";
+            //testto commit
         }
     }
 }

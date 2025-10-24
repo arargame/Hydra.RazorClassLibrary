@@ -5,6 +5,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 {
     public interface IHtmlElementComponent<T>
     {
+
         Guid Id { get; set; }
 
         string? Name { get; set; }
@@ -25,8 +26,12 @@ namespace Hydra.RazorClassLibrary.ComponentModels
     }
     public abstract class HtmlElementComponent<T> : ComponentBase,IHtmlElementComponent<T>
     {
+
+        public event Action? ContentChanged;
         [Parameter]
         public Guid Id { get; set; }
+
+        [Parameter]
         public string? Name { get; set; }
 
         // Label veya display adı
@@ -50,6 +55,9 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         [Parameter]
         public bool IsVisible { get; set; } = true;
 
+        [Parameter]
+        public bool IsTested { get; set; } = false;
+
         // Ek CSS sınıfları
         [Parameter]
         public string? CssClass { get; set; }
@@ -72,8 +80,6 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             Id = Guid.NewGuid();
 
             SetName("HtmlElementComponent");
-
-
         }
 
 
@@ -82,7 +88,6 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         {
             Value = newValue;
             await ValueChanged.InvokeAsync(newValue);
-
 
             Debugger?.Clear();
             FillDebuggerAttributes();
@@ -116,12 +121,38 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         public HtmlElementComponent<T> SetContent(RenderFragment content)
         {
             Content = content;
+
+            ContentChanged?.Invoke();
+
+            return this;
+        }
+
+        public HtmlElementComponent<T> SetDebugger(ComponentDebugger debugger)
+        {
+            Debugger = debugger;
+
             return this;
         }
         public HtmlElementComponent<T> SetName(string name)
         {
             Name = name;
             return this;
+        }
+
+        protected override void OnParametersSet()
+        {
+            if (IsTested)
+            {
+                if (Debugger == null)
+                    Debugger = new ComponentDebugger();
+
+                if (!Debugger.Attributes.Any())
+                {
+                    FillDebuggerAttributes();
+                }
+            }
+
+
         }
 
         public virtual async Task OnChange(ChangeEventArgs e)

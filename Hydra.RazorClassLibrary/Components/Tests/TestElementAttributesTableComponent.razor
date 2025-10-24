@@ -61,4 +61,21 @@ else
 
 @code {
     [Parameter] public ComponentDebugger? Debugger { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Debugger != null)
+            Debugger.OnChange += HandleDebuggerChanged;
+    }
+
+    private void HandleDebuggerChanged()
+    {
+        InvokeAsync(StateHasChanged); // UI’yı yeniler
+    }
+
+    public void Dispose()
+    {
+        if (Debugger != null)
+            Debugger.OnChange -= HandleDebuggerChanged;
+    }
 }

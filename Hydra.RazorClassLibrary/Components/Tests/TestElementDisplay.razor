@@ -1,6 +1,5 @@
 ﻿@using Hydra.RazorClassLibrary.Utils
 @typeparam TTypeOfHtmlElementComponent
-@typeparam TypeOfComponent
 
 @if(HtmlElementComponent==null)
 {
@@ -9,7 +8,6 @@
 else
 {
     <div class="container mt-3">
-        <h2>Card Header and Footer</h2>
         <div class="card">
 
             <div class="card-header">
@@ -36,12 +34,25 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var renderFragment = BlazorHelper.GetRenderFragment(type:typeof(TypeOfComponent));
-
-        HtmlElementComponent.SetContent(renderFragment);
-
-        //HtmlElementComponent.Debugger = new ComponentDebugger();
-
         await base.OnInitializedAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        HtmlElementComponent!.ContentChanged -= OnContentChanged;
+        HtmlElementComponent!.ContentChanged += OnContentChanged;
+    }
+
+    private void OnContentChanged()
+    {
+        InvokeAsync(StateHasChanged);
     }
 }

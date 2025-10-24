@@ -8,6 +8,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 {
     public class ComponentDebugger
     {
+        public event Action? OnChange;
         public Dictionary<string,string> Attributes { get; set; } = new Dictionary<string, string>();
         public ComponentDebugger() { }
 
@@ -17,6 +18,8 @@ namespace Hydra.RazorClassLibrary.ComponentModels
                 Attributes[key] = "null";
             else
                 Attributes[key] = value.ToString()!;
+
+            OnChange?.Invoke();
         }
 
         public string? Get(string key)
@@ -24,6 +27,11 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             return Attributes.TryGetValue(key, out var val) ? val : null;
         }
 
-        public void Clear() => Attributes.Clear();
+        public void Clear() 
+        {
+            Attributes.Clear();
+
+            OnChange?.Invoke();
+        }
     }
 }

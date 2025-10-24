@@ -21,7 +21,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
         string? CssClass { get; set; }
 
-        Task OnChange(ChangeEventArgs e);
+        Task OnChange(ChangeEventArgs e);//
     }
     public abstract class HtmlElementComponent<T> : ComponentBase,IHtmlElementComponent<T>
     {

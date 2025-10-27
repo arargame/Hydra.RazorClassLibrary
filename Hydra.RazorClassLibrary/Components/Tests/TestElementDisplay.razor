@@ -1,58 +1,23 @@
-﻿@using Hydra.RazorClassLibrary.Utils
-@typeparam TTypeOfHtmlElementComponent
+﻿@using Hydra.RazorClassLibrary.ComponentModels
 
-@if(HtmlElementComponent==null)
-{
-    <p>HtmlElementComponent is null</p>
-}
-else
-{
-    <div class="container mt-3">
-        <div class="card">
+<div class="container mt-3">
+    <div class="card">
+        <div class="card-header bg-light fw-bold">
+            @HeaderTitle
+        </div>
 
-            <div class="card-header">
-                @HtmlElementComponent.Name
-            </div>
+        <div class="card-body">
+            @ChildContent
+        </div>
 
-            <div class="card-body">
-               @*  <DynamicComponent Type="typeof(CheckboxComponent)" /> *@
-               @HtmlElementComponent.Content
-            </div>
-
-            <div class="card-footer">
-                <TestElementAttributesTableComponent Debugger="@HtmlElementComponent.Debugger"></TestElementAttributesTableComponent>
-            </div>
+        <div class="card-footer">
+            <TestElementAttributesTableComponent Debugger="@Debugger" />
         </div>
     </div>
-}
-
-
+</div>
 
 @code {
-    [Parameter]
-    public HtmlElementComponent<TTypeOfHtmlElementComponent> HtmlElementComponent { get; set; } = default!;
-
-    protected override async Task OnInitializedAsync()
-    {
-        await base.OnInitializedAsync();
-    }
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender)
-        {
-
-        }
-    }
-
-    protected override void OnParametersSet()
-    {
-        HtmlElementComponent!.ContentChanged -= OnContentChanged;
-        HtmlElementComponent!.ContentChanged += OnContentChanged;
-    }
-
-    private void OnContentChanged()
-    {
-        InvokeAsync(StateHasChanged);
-    }
+    [Parameter] public string HeaderTitle { get; set; } = "Component Preview";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public ComponentDebugger? Debugger { get; set; }
 }

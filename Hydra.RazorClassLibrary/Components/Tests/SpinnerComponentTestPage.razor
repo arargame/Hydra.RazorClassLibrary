@@ -1,0 +1,13 @@
+﻿@page "/spinner-component-test"
+@using Hydra.RazorClassLibrary.Components
+@using Hydra.RazorClassLibrary.Utils
+
+<TestElementDisplay HeaderTitle="Spinner Test" Debugger="@Debugger">
+    <SpinnerComponent Debugger="@Debugger"
+                       IsTested="true" />
+</TestElementDisplay>
+
+@code {
+    private ComponentDebugger Debugger = new();
+
+}

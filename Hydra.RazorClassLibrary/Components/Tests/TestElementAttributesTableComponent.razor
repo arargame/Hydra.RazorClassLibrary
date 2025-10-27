@@ -43,10 +43,19 @@
         <tbody>
             @if (Debugger != null)
             {
-                @foreach (var kvp in Debugger.Attributes)
+                @foreach (var kvp in Debugger.Attributes.OrderBy(kv => kv.Key))
                 {
                     <tr>
-                        <td>@kvp.Key</td>
+                        <td>
+                            @if (kvp.Key == nameof(HtmlElementComponentWithValue<object>.Value))
+                            {
+                                <span class="badge text-bg-primary"> @kvp.Key</span>
+                            }
+                            else
+                            {
+                                @kvp.Key
+                            }
+                        </td>
                         <td>@kvp.Value</td>
                     </tr>
                 }

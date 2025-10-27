@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,15 +6,17 @@ using System.Threading.Tasks;
 
 namespace Hydra.RazorClassLibrary.ComponentModels
 {
-    internal class TestComponentModel : HtmlElementComponentWithValue<string>
+    public class SpinnerComponentModel : HtmlElementComponent
     {
+        public SpinnerComponentModel() : base()
+        {
+
+        }
         public override void Initialize()
         {
             base.Initialize();
 
-            SetName("TestComponentModel");
-
-            Value = "Initial Value";
+            SetName("Spinner");
         }
     }
 }

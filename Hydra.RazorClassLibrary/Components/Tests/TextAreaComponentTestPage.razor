@@ -1,0 +1,13 @@
+﻿@page "/textarea-component-test"
+@using Hydra.RazorClassLibrary.Components
+@using Hydra.RazorClassLibrary.Utils
+
+<TestElementDisplay HeaderTitle="Text Area Test" Debugger="@Debugger">
+    <TextAreaComponent Debugger="@Debugger"
+                      IsTested="true" />
+</TestElementDisplay>
+
+
+@code {
+    private ComponentDebugger Debugger = new();
+}

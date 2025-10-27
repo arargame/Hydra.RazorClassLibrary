@@ -2,7 +2,29 @@
 
 <CheckboxComponentTestPage></CheckboxComponentTestPage>
 
+<InputComponentTestPage></InputComponentTestPage>
+
+<SpinnerComponentTestPage></SpinnerComponentTestPage>
+
+<TextAreaComponentTestPage></TextAreaComponentTestPage>
+
+@* <CheckboxComponent></CheckboxComponent> *@
+
+@* <InputComponent T="string" ValueChanged="OnValueChanged"></InputComponent> *@
 
 @code {
+    // public InputComponentModel<string> InputModel { get; set; } = new InputComponentModel<string>();
 
+    protected override void OnInitialized()
+    {
+        // InputModel.SetType(HtmlInputType.text);
+        // InputModel.CssClass ="test";
+
+        base.OnInitialized();
+    }
+
+    private void OnValueChanged(string newValue)
+    {
+        
+    }
 }

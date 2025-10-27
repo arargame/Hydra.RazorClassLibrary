@@ -1,0 +1,47 @@
+﻿@page "/input-component-test"
+@using Hydra.RazorClassLibrary.ComponentModels.InputComponents
+@using Hydra.RazorClassLibrary.Components
+@using Hydra.RazorClassLibrary.Utils
+
+@* 
+<TestElementDisplay TTypeOfHtmlElementComponent="string" HtmlElementComponent="ComponentModel">
+</TestElementDisplay> *@
+
+@* <TestElementDisplay HeaderTitle="Checkbox Test" Debugger="@MyDebugger">
+    <InputComponent T="string" 
+                        Debugger="@MyDebugger"
+                       IsTested="true" />
+</TestElementDisplay> *@
+
+<TestElementDisplay HeaderTitle="Input Component Test" Debugger="@MyDebugger2">
+    <InputComponent T="string"
+                    Debugger="@MyDebugger2"
+                    IsTested="true" />
+</TestElementDisplay>
+
+@code {
+    private InputComponentModel<string> ComponentModel = new();
+
+    private ComponentDebugger MyDebugger = new();
+    private ComponentDebugger MyDebugger2 = new();
+
+    protected override void OnInitialized()
+    {
+        var ComponentDebugger = new ComponentDebugger();
+
+        var renderFragment = BlazorHelper.GetRenderFragment(type: typeof(InputComponent<string>),
+                                                            parameters: new Dictionary<string, object>()
+                                                            {
+                                                                { "Debugger", ComponentDebugger },
+                                                                {"IsTested", true }
+                                                            });
+
+
+        ComponentModel.SetContent(renderFragment)
+                                .SetDebugger(ComponentDebugger);
+
+
+
+        base.OnInitialized();
+    }
+}

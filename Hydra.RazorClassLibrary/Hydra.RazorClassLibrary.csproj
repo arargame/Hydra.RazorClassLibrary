@@ -13,6 +13,12 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="Hydra">
+      <HintPath>..\..\Hydra\bin\Debug\net8.0\Hydra.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 
 
 </Project>

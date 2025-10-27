@@ -1,0 +1,41 @@
+﻿@typeparam T
+@inherits InputComponentModel<T>
+
+@* 
+<input type="@TypeName"
+       class="@GetElementCssClass()"
+       @onchange="@OnChange"
+       disabled="@IsDisabled"
+       value="@(typeof(T) != typeof(bool) ? @Value : null)" /> *@
+
+@* 
+<input type="@Model?.TypeName" 
+        @onchange="@Model.OnChange"
+       class="@Model?.GetElementCssClass()"/> *@
+
+<input type="@TypeName"
+       @onchange="@OnChange"
+       class="@GetElementCssClass()" />
+
+
+@code {
+
+    // [Parameter]
+    // public InputComponentModel<T>? Model { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // if (Model == null)
+        //     throw new InvalidOperationException("InputComponent requires a non-null Model parameter.");
+
+        // IsTested = Model.IsTested;
+        // Debugger = Model.Debugger;
+
+        base.OnInitialized();
+    }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+    }
+}

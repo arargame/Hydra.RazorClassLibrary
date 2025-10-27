@@ -1,30 +1,43 @@
-﻿@page "/checkboxcomponent-test"
+﻿@page "/checkbox-component-test"
 @using Hydra.RazorClassLibrary.Components
 @using Hydra.RazorClassLibrary.Utils
 
 
-<TestElementDisplay TTypeOfHtmlElementComponent="bool"  HtmlElementComponent="CheckboxComponentModel">
+@* <TestElementDisplay TTypeOfHtmlElementComponent="bool" HtmlElementComponent="ComponentModel" Debugger="Debugger">
+    <ChildContent>
+        <CheckboxComponent Debugger="Debugger" IsTested="true" Id="Guid.NewGuid()"></CheckboxComponent>
+    </ChildContent>
+</TestElementDisplay> *@
+
+
+<TestElementDisplay HeaderTitle="Checkbox Test" Debugger="@MyDebugger">
+    <CheckboxComponent Debugger="@MyDebugger"
+                       IsTested="true"/>
 </TestElementDisplay>
 
-
 @code {
+    private ComponentDebugger MyDebugger = new();
 
-    private CheckboxComponentModel CheckboxComponentModel = new();
+    // private ComponentDebugger Debugger = new ComponentDebugger();
+    // private CheckboxComponentModel? ComponentModel;
 
     protected override void OnInitialized()
     {
-        var ComponentDebugger = new ComponentDebugger();
+        // ComponentModel = new CheckboxComponentModel();        ;
 
-        var renderFragment = BlazorHelper.GetRenderFragment(type: typeof(CheckboxComponent),
-                                                            parameters: new Dictionary<string, object>()
-                                                            {
-                                                                { "Debugger", ComponentDebugger },
-                                                                {"IsTested", true }
-                                                            });
+        // var ComponentDebugger = new ComponentDebugger();
+
+        // var renderFragment = BlazorHelper.GetRenderFragment(type: typeof(CheckboxComponent),
+        //                                                     parameters: new Dictionary<string, object>()
+        //                                                         {
+        //                                                             { "Debugger", Debugger },
+        //                                                             {"IsTested", true },
+        //                                                             {  "Id", ComponentModel.Id }
+        //                                                         });
 
 
-        CheckboxComponentModel.SetContent(renderFragment)
-                                .SetDebugger(ComponentDebugger);
+        // ComponentModel.SetContent(renderFragment)
+        //                         .SetDebugger(ComponentDebugger);
 
 
 

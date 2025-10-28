@@ -22,6 +22,8 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             SetName("Checkbox");
 
             SetType(HtmlInputType.checkbox);
+
+            SetCssStyle("");
         }
     }
 }

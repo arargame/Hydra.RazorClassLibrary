@@ -1,14 +1,20 @@
 ﻿@inherits CheckboxComponentModel
 
-
-<InputComponent T="bool"
+<InputComponent CssStyle="@CssStyle"
+                Debugger="@Debugger"
+                Id="@Id"
+                IsDisabled="@IsDisabled"
+                IsReadonly="@IsReadonly"
+                IsTested="@IsTested"
+                IsVisible="@IsVisible"
+                LabelValue="@LabelValue"
+                Name="@Name"
+                Placeholder="@Placeholder"
+                T="bool"
                 Type="@Type"
                 Value="@Value"
-                ValueChanged="@ValueChanged"
-                Id="@Id"
-                Name="@Name"
-                Debugger="@Debugger"
-                IsTested="@IsTested"/>
+                ValueChanged="@ValueChanged" 
+                WithLabel="@WithLabel" />
        
 
 

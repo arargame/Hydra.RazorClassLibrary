@@ -1,10 +1,40 @@
 ﻿@inherits TextAreaComponentModel
 
-<textarea class="form-control"
-            placeholder="Leave a comment here" 
-            id="floatingTextarea">
-</textarea>
+
+@if (WithLabel)
+{
+    <div class="form-floating">
+
+        @RenderElement()
+
+        <LabelComponent For="@GetElementId()" Value="@LabelValue"></LabelComponent>
+    </div>
+}
+else
+{
+    @RenderElement()
+}
+
 
 @code {
 
+    private RenderFragment RenderElement() => __builder =>
+    {
+        if (!IsVisible) return;
+
+        <textarea class="@GetElementCssStyle()"
+                  disabled="@IsDisabled"
+                  readonly="@IsReadonly"
+                  id="@GetElementId()"
+                  @onchange="OnChange"
+                  placeholder="@Placeholder"
+                  value="@Value">
+                </textarea>
+        ;
+    };
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
 }

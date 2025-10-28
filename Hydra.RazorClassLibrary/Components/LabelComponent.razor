@@ -1,0 +1,18 @@
+﻿@inherits LabelComponentModel
+
+@RenderElement()
+
+@code {
+
+    private RenderFragment RenderElement() => __builder =>
+    {
+        if (!IsVisible) return;
+
+        <label style="@GetElementCssStyle()"
+               for="@For"
+               id="@GetElementId()">
+            @Value
+        </label>
+        ;
+    };
+}

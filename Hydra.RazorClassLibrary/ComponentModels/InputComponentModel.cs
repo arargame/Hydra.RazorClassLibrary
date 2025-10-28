@@ -67,7 +67,14 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             SetName("Input");
 
             SetType(HtmlInputType.text);
+
+            SetLabelValue("Input with value");
+
+            SetCssStyle("form-control");
         }
+
+
+
         public override void FillDebuggerAttributes()
         {
             base.FillDebuggerAttributes();

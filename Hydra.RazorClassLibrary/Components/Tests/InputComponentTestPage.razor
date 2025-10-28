@@ -13,17 +13,20 @@
                        IsTested="true" />
 </TestElementDisplay> *@
 
-<TestElementDisplay HeaderTitle="Input Component Test" Debugger="@MyDebugger2">
+<TestElementDisplay HeaderTitle="Input Component Test" Debugger="@MyDebugger">
     <InputComponent T="string"
-                    Debugger="@MyDebugger2"
-                    IsTested="true" />
+                    Debugger="@MyDebugger"
+                    IsTested="true" 
+                    Value="@StarterValue" 
+                    WithLabel="true"/>
 </TestElementDisplay>
 
 @code {
     private InputComponentModel<string> ComponentModel = new();
 
     private ComponentDebugger MyDebugger = new();
-    private ComponentDebugger MyDebugger2 = new();
+
+    private string StarterValue { get; set; } = "Init Value";
 
     protected override void OnInitialized()
     {

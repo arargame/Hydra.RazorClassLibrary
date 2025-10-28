@@ -1,9 +1,17 @@
 ﻿@inherits SpinnerComponentModel
 
-<div class="spinner-border m-5" role="status">
-    <span class="visually-hidden">Loading...</span>
-</div>
+@RenderElement()
 
 @code {
+
+    private RenderFragment RenderElement() => __builder =>
+    {
+        if (!IsVisible) return;
+
+        <div class="spinner-border m-5" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        ;
+    };
 
 }

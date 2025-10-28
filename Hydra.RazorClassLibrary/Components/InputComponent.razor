@@ -8,29 +8,40 @@
        disabled="@IsDisabled"
        value="@(typeof(T) != typeof(bool) ? @Value : null)" /> *@
 
-@* 
-<input type="@Model?.TypeName" 
-        @onchange="@Model.OnChange"
-       class="@Model?.GetElementCssClass()"/> *@
 
-<input type="@TypeName"
-       @onchange="@OnChange"
-       class="@GetElementCssClass()" />
+@if (WithLabel)
+{
+    <div class="form-floating">
 
+        @RenderElement()
+
+        <LabelComponent For="@GetElementId()" Value="@LabelValue"></LabelComponent>
+    </div>
+}
+else
+{
+    @RenderElement()
+}
 
 @code {
 
-    // [Parameter]
-    // public InputComponentModel<T>? Model { get; set; }
+    private RenderFragment RenderElement() => __builder =>
+    {
+        if (!IsVisible) return;
+
+        <input class="@GetElementCssStyle()"
+               disabled="@IsDisabled"
+               id="@GetElementId()"
+               @onchange="@OnChange"
+               placeholder="@Placeholder"
+               readonly="@IsReadonly"
+               type="@TypeName"
+               value="@(typeof(T) != typeof(bool) ? Value : null)" />
+        ;
+    };
 
     protected override void OnInitialized()
     {
-        // if (Model == null)
-        //     throw new InvalidOperationException("InputComponent requires a non-null Model parameter.");
-
-        // IsTested = Model.IsTested;
-        // Debugger = Model.Debugger;
-
         base.OnInitialized();
     }
 

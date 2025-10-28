@@ -8,14 +8,24 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 {
     public interface IHtmlElementComponent
     {
+        string? AdditionalCssStyle { get; set; }
+
+        RenderFragment? ChildContent { get; set; }
+        string? CssStyle { get; set; }
+
+        ComponentDebugger? Debugger { get; set; }
         Guid Id { get; set; }
-        string? Name { get; set; }
-        string? Label { get; set; }
+        
         bool IsDisabled { get; set; }
         bool IsVisible { get; set; }
-        string? CssClass { get; set; }
-        RenderFragment? ChildContent { get; set; }
+        bool IsTested { get; set; }
 
+
+        string? LabelValue { get; set; }
+
+        string? Name { get; set; }
+        string? Placeholder { get; set; }
+        
         Task OnChange(ChangeEventArgs e);
     }
 
@@ -26,49 +36,44 @@ namespace Hydra.RazorClassLibrary.ComponentModels
     }
     public abstract class HtmlElementComponent : ComponentBase, IHtmlElementComponent
     {
+        [Parameter]
+        public string? AdditionalCssStyle { get; set; }
+
+        [Parameter]
+        public RenderFragment? ChildContent { get; set; }
+
+        [Parameter]
+        public string? CssStyle { get; set; }
 
         public event Action? ContentChanged;
-        [Parameter]
-        public Guid Id
-        {
-            get;
-            set;
-        }
 
         [Parameter]
-        public string? Name { get; set; }
+        public Guid Id { get; set; }
 
-        // Label veya display adı
-        [Parameter]
-        public string? Label { get; set; }
-
-        //// Input değeri
-        //[Parameter]
-        //public T? Value { get; set; }
-
-
-        //// Değer değiştiğinde parent component'e bildirmek için event
-        //[Parameter]
-        //public EventCallback<T?> ValueChanged { get; set; }
-
-        // Kullanıcı tarafından pasif hale getirilebilir
         [Parameter]
         public bool IsDisabled { get; set; }
 
-        // Görünürlük kontrolü
+        [Parameter]
+        public bool IsReadonly { get; set; } = false;
+
+
         [Parameter]
         public bool IsVisible { get; set; } = true;
 
         [Parameter]
         public bool IsTested { get; set; } = false;
 
-        // Ek CSS sınıfları
-        [Parameter]
-        public string? CssClass { get; set; }
 
-        // İçerik (örneğin label veya slot)
+
         [Parameter]
-        public RenderFragment? ChildContent { get; set; }
+        public string? LabelValue { get; set; }
+
+
+        [Parameter]
+        public string? Name { get; set; }
+
+        [Parameter]
+        public string? Placeholder { get; set; }
 
         public RenderFragment? Content { get; set; }
 
@@ -87,53 +92,37 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         }
 
 
+        public virtual string GetElementCssStyle() =>
+                                $"{CssStyle + AdditionalCssStyle} " +
+                                $"{(IsDisabled ? "opacity-50 cursor-not-allowed" : "")} " +
+                                $"{(IsReadonly ? "bg-light" : "")}".Trim();
 
-        //protected async Task NotifyValueChangedAsync(T? newValue)
-        //{
-        //    Value = newValue;
-        //    await ValueChanged.InvokeAsync(newValue);
 
-        //    Debugger?.Clear();
-        //    FillDebuggerAttributes();
-        //}
+        public virtual string GetElementId() =>
+            Id.ToString();
 
-        // Derived component'ler override edebilir
-        public virtual string GetElementCssClass() =>
-            $"{CssClass} {(IsDisabled ? "opacity-50 cursor-not-allowed" : "")}".Trim();
-
-        // Component görünür değilse render edilmez
-        //protected override void BuildRenderTree(RenderTreeBuilder builder)
-        //{
-        //    if (!IsVisible)
-        //        return;
-
-        //    builder.OpenElement(0, "HtmlElementComponent");
-        //    builder.AddAttribute(1, "id", Id.ToString());
-        //    builder.AddAttribute(2, "name", Name);
-
-        //    builder.AddAttribute(4, "class", GetElementCssClass());
-
-        //    if (Value is not null)
-        //        builder.AddAttribute(5, "value", Value);
-
-        //    if (IsDisabled)
-        //        builder.AddAttribute(6, "disabled", true);
-
-        //    builder.AddAttribute(7, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, OnChange));
-
-        //    builder.CloseElement();
-        //}
 
         public virtual void FillDebuggerAttributes()
         {
             if (Debugger == null) return;
 
+            Debugger.Set("AdditionalCssStyle", AdditionalCssStyle);
+            Debugger.Set("CssStyle", CssStyle);
             Debugger.Set("Id", Id);
-            Debugger.Set("Name", Name);
-            //Debugger.Set("Value", Value);
-            Debugger.Set("CssClass", CssClass);
             Debugger.Set("IsDisabled", IsDisabled);
+            Debugger.Set("IsReadonly", IsReadonly);
             Debugger.Set("IsVisible", IsVisible);
+            Debugger.Set("IsTested", IsTested);
+            Debugger.Set("LabelValue", LabelValue);
+            Debugger.Set("Name", Name);
+            Debugger.Set("Placeholder", Placeholder);
+        }
+
+        public HtmlElementComponent SetAdditionalCssStyle(string additionalCssStyle)
+        {
+            AdditionalCssStyle = additionalCssStyle;
+
+            return this;
         }
 
         public HtmlElementComponent SetContent(RenderFragment content)
@@ -145,9 +134,23 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             return this;
         }
 
+        public HtmlElementComponent SetCssStyle(string cssStyle)
+        {
+            CssStyle = cssStyle;
+
+            return this;
+        }
+
         public HtmlElementComponent SetDebugger(ComponentDebugger debugger)
         {
             Debugger = debugger;
+
+            return this;
+        }
+
+        public HtmlElementComponent SetLabelValue(string labelValue)
+        {
+            LabelValue = labelValue;
 
             return this;
         }
@@ -157,12 +160,12 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             return this;
         }
 
-        protected override void OnInitialized()
+        public HtmlElementComponent SetPlaceholder(string placeholder)
         {
-            base.OnInitialized();
-
-            //Initialize();
+            Placeholder = placeholder;
+            return this;
         }
+
 
         protected override void OnParametersSet()
         {
@@ -185,8 +188,13 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
     public abstract class HtmlElementComponentWithValue<T> : HtmlElementComponent, IHtmlElementComponentWithValue<T>
     {
+
         [Parameter] public T? Value { get; set; }
         [Parameter] public EventCallback<T?> ValueChanged { get; set; }
+
+        [Parameter]
+        public bool WithLabel { get; set; }
+
 
         public HtmlElementComponentWithValue() : base()
         {
@@ -197,7 +205,12 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             base.Initialize();
 
             SetName("Html Element Component With Value");
+
+            SetPlaceholder("Leave a comment here");
+
+            SetCssStyle("form-control");
         }
+
 
         protected async Task NotifyValueChangedAsync(T? newValue)
         {
@@ -213,22 +226,25 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         {
             base.FillDebuggerAttributes();
             Debugger?.Set("Value", Value);
+            Debugger?.Set("WithLabel",WithLabel);
         }
 
-        protected override void BuildRenderTree(RenderTreeBuilder builder)
-        {
-            if (!IsVisible) return;
+        //protected override void BuildRenderTree(RenderTreeBuilder builder)
+        //{
+        //    if (!IsVisible) return;
 
-            builder.OpenElement(0, "input");
-            builder.AddAttribute(1, "id", Id.ToString());
-            builder.AddAttribute(2, "name", Name);
-            builder.AddAttribute(3, "class", GetElementCssClass());
-            builder.AddAttribute(4, "value", Value?.ToString());
-            builder.AddAttribute(5, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, OnChange));
-            if (IsDisabled)
-                builder.AddAttribute(6, "disabled", true);
-            builder.CloseElement();
-        }
+        //    builder.OpenElement(0, "input");
+        //    builder.AddAttribute(1, "id", Id.ToString());
+        //    builder.AddAttribute(2, "name", Name);
+        //    builder.AddAttribute(3, "class", GetElementCssStyle());
+        //    builder.AddAttribute(4, "value", Value?.ToString());
+        //    builder.AddAttribute(5, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, OnChange));
+        //    if (IsDisabled)
+        //        builder.AddAttribute(6, "disabled", true);
+        //    builder.CloseElement();
+        //}
+
+
 
         public override async Task OnChange(ChangeEventArgs e)
         {
@@ -273,6 +289,17 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             }
 
             await NotifyValueChangedAsync(parsedValue);
+        }
+
+
+        protected override void OnParametersSet()
+        {
+            if (WithLabel)
+            {
+                LabelValue = "Comments";
+            }
+
+            base.OnParametersSet();
         }
     }
         

@@ -1,0 +1,30 @@
+﻿@inherits DropdownListComponentModel
+
+<select class="form-select"
+        @onchange="OnSelectedValueChanged">
+    @foreach (var option in Options)
+    {
+        <option value="@option.Key" selected="@option.IsSelected">
+            @option.Value
+        </option>
+    }
+</select>
+
+<h2>Selected Option:</h2>
+Key : @SelectedOption.Key
+Value : @SelectedOption.Value
+
+@code {
+
+    protected override void OnInitialized()
+    {
+        SetOptions(options: new[]
+        {
+            new DropdownListOption(key:"1",value:"Option1",isSelected:false),
+            new DropdownListOption(key:"2",value:"Option2",isSelected:false),
+            new DropdownListOption(key:"3",value:"Option3",isSelected:false)
+        });
+
+        base.OnInitialized();
+    }
+}

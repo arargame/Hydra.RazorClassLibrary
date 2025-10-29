@@ -1,0 +1,20 @@
+﻿@page "/dropdownlist-component-test"
+@using Hydra.RazorClassLibrary.Components
+@using Hydra.RazorClassLibrary.Utils
+
+<TestElementDisplay HeaderTitle="DropdownList Test" Debugger="@Debugger">
+    <DropdownListComponent Debugger="@Debugger"
+                       IsTested="true"
+                       WithSelectPlaceholder="true"
+                           OnSelectedOptionChanged="HandleSelectedOptionChanged" />
+</TestElementDisplay>
+
+
+@code {
+    private ComponentDebugger Debugger = new();
+
+    private void HandleSelectedOptionChanged(DropdownListOption option)
+    {
+        Console.WriteLine($"Seçilen: {option.Key} - {option.Value}");
+    }
+}

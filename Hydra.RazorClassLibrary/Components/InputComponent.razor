@@ -1,13 +1,6 @@
 ﻿@typeparam T
 @inherits InputComponentModel<T>
 
-@* 
-<input type="@TypeName"
-       class="@GetElementCssClass()"
-       @onchange="@OnChange"
-       disabled="@IsDisabled"
-       value="@(typeof(T) != typeof(bool) ? @Value : null)" /> *@
-
 
 @if (WithLabel)
 {
@@ -29,24 +22,15 @@ else
     {
         if (!IsVisible) return;
 
-        <input class="@GetElementCssStyle()"
+        <input class="@GetElementCssClass()"
                disabled="@IsDisabled"
                id="@GetElementId()"
                @onchange="@OnChange"
                placeholder="@Placeholder"
                readonly="@IsReadonly"
+               style="@GetElementCssStyle()"
                type="@TypeName"
                value="@(typeof(T) != typeof(bool) ? Value : null)" />
         ;
     };
-
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-    }
-
-    protected override void OnParametersSet()
-    {
-        base.OnParametersSet();
-    }
 }

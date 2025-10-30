@@ -8,9 +8,10 @@
     {
         if (!IsVisible) return;
 
-        <label style="@GetElementCssStyle()"
+        <label class="@GetElementCssClass()"
                for="@For"
-               id="@GetElementId()">
+               id="@GetElementId()"
+               style="@GetElementCssStyle()">
             @Value
         </label>
         ;

@@ -1,0 +1,19 @@
+﻿@page "/button-component-test"
+@using Hydra.RazorClassLibrary.Components
+@using Hydra.RazorClassLibrary.Utils
+
+<TestElementDisplay HeaderTitle="Button Test" Debugger="@Debugger">
+   <ButtonComponent Debugger="@Debugger"
+                    Text="Click On Me!" 
+                    OnClicked="OnClicked">
+                </ButtonComponent>
+</TestElementDisplay>
+
+@code {
+    private ComponentDebugger Debugger = new();
+
+    private void OnClicked(Guid id)
+    {
+        
+    }
+}

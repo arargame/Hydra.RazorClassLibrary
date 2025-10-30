@@ -1,0 +1,21 @@
+﻿@inherits ButtonComponentModel
+
+@RenderElement()
+
+
+@code {
+    private RenderFragment RenderElement() => __builder =>
+    {
+        if (!IsVisible) return;
+
+        <button class="@GetElementCssClass()"
+                disabled="@IsDisabled"
+                id="@GetElementId()"
+                @onclick="@OnClick"
+                style="@GetElementCssStyle()"
+                type="button">
+            @Text
+        </button>
+        ;
+    };
+}

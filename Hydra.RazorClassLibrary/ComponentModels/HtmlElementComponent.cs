@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using System.Diagnostics;
 using System.Xml.Linq;
@@ -9,8 +10,11 @@ namespace Hydra.RazorClassLibrary.ComponentModels
     public interface IHtmlElementComponent
     {
         string? AdditionalCssStyle { get; set; }
+        string? AdditionalCssClass { get; set; }
 
         RenderFragment? ChildContent { get; set; }
+
+        string? CssClass { get; set; }
         string? CssStyle { get; set; }
 
         ComponentDebugger? Debugger { get; set; }
@@ -25,8 +29,16 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
         string? Name { get; set; }
         string? Placeholder { get; set; }
-        
+
+        Task OnClick(MouseEventArgs e);
         Task OnChange(ChangeEventArgs e);
+    }
+
+    public interface IHtmlElementWithText : IHtmlElementComponent
+    {
+        string? Text { get; set; }
+
+        IHtmlElementWithText SetText(string text);
     }
 
     public interface IHtmlElementComponentWithValue<T> : IHtmlElementComponent
@@ -37,10 +49,16 @@ namespace Hydra.RazorClassLibrary.ComponentModels
     public abstract class HtmlElementComponent : ComponentBase, IHtmlElementComponent
     {
         [Parameter]
+        public string? AdditionalCssClass { get; set; }
+
+        [Parameter]
         public string? AdditionalCssStyle { get; set; }
 
         [Parameter]
         public RenderFragment? ChildContent { get; set; }
+
+        [Parameter]
+        public string? CssClass { get; set; }
 
         [Parameter]
         public string? CssStyle { get; set; }
@@ -79,6 +97,10 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
         [Parameter]
         public ComponentDebugger? Debugger { get; set; }
+
+
+        [Parameter]
+        public EventCallback<Guid> OnClicked { get; set; }
         public HtmlElementComponent()
         {
             Initialize();
@@ -91,11 +113,13 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             SetName("HtmlElementComponent");
         }
 
-
-        public virtual string GetElementCssStyle() =>
-                                $"{CssStyle + AdditionalCssStyle} " +
+        public virtual string GetElementCssClass() =>
+                                $"{CssClass + AdditionalCssClass}" +
                                 $"{(IsDisabled ? "opacity-50 cursor-not-allowed" : "")} " +
                                 $"{(IsReadonly ? "bg-light" : "")}".Trim();
+
+        public virtual string GetElementCssStyle() =>
+                                $"{CssStyle + AdditionalCssStyle} ";
 
 
         public virtual string GetElementId() =>
@@ -183,6 +207,11 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         public virtual async Task OnChange(ChangeEventArgs e)
         {
             await Task.CompletedTask;
+        }
+
+        public virtual async Task OnClick(MouseEventArgs e)
+        {
+            await OnClicked.InvokeAsync(Id);
         }
     }
 

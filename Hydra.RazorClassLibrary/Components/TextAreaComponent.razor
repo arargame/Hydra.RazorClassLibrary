@@ -22,12 +22,13 @@ else
     {
         if (!IsVisible) return;
 
-        <textarea class="@GetElementCssStyle()"
+        <textarea class="@GetElementCssClass()"
                   disabled="@IsDisabled"
                   readonly="@IsReadonly"
                   id="@GetElementId()"
                   @onchange="OnChange"
                   placeholder="@Placeholder"
+                  style="@GetElementCssStyle()"
                   value="@Value">
                 </textarea>
         ;

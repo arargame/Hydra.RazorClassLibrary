@@ -2,46 +2,18 @@
 @using Hydra.RazorClassLibrary.Components
 @using Hydra.RazorClassLibrary.Utils
 
-
-@* <TestElementDisplay TTypeOfHtmlElementComponent="bool" HtmlElementComponent="ComponentModel" Debugger="Debugger">
-    <ChildContent>
-        <CheckboxComponent Debugger="Debugger" IsTested="true" Id="Guid.NewGuid()"></CheckboxComponent>
-    </ChildContent>
-</TestElementDisplay> *@
-
-<TestElementDisplay HeaderTitle="Checkbox Test" Debugger="@MyDebugger">
-    <CheckboxComponent Debugger="@MyDebugger"
+<TestElementDisplay HeaderTitle="Checkbox Test" Debugger="@Debugger">
+    <CheckboxComponent Debugger="@Debugger"
                        IsTested="true"
                        IsDisabled="true"
                        IsVisible="false"/>
 </TestElementDisplay>
 
 @code {
-    private ComponentDebugger MyDebugger = new();
-
-    // private ComponentDebugger Debugger = new ComponentDebugger();
-    // private CheckboxComponentModel? ComponentModel;
+    private ComponentDebugger Debugger = new();
 
     protected override void OnInitialized()
     {
-        // ComponentModel = new CheckboxComponentModel();        ;
-
-        // var ComponentDebugger = new ComponentDebugger();
-
-        // var renderFragment = BlazorHelper.GetRenderFragment(type: typeof(CheckboxComponent),
-        //                                                     parameters: new Dictionary<string, object>()
-        //                                                         {
-        //                                                             { "Debugger", Debugger },
-        //                                                             {"IsTested", true },
-        //                                                             {  "Id", ComponentModel.Id }
-        //                                                         });
-
-
-        // ComponentModel.SetContent(renderFragment)
-        //                         .SetDebugger(ComponentDebugger);
-
-
-
         base.OnInitialized();
     }
 }

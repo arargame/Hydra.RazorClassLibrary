@@ -17,7 +17,10 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         public override void Initialize()
         {
             base.Initialize();
+
             SetName("Label");
+
+            RemoveClass("form-control");
         }
     }
 }

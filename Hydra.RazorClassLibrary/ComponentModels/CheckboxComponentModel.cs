@@ -23,7 +23,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
             SetType(HtmlInputType.checkbox);
 
-            SetCssStyle("");
+            RemoveClass("form-control");
         }
     }
 }

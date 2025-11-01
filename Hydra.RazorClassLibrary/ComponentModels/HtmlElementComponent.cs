@@ -9,13 +9,13 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 {
     public interface IHtmlElementComponent
     {
-        string? AdditionalCssStyle { get; set; }
-        string? AdditionalCssClass { get; set; }
+        //string? AdditionalCssStyle { get; set; }
+        //string? AdditionalCssClass { get; set; }
 
         RenderFragment? ChildContent { get; set; }
 
-        string? CssClass { get; set; }
-        string? CssStyle { get; set; }
+        //string? CssClass { get; set; }
+        //string? CssStyle { get; set; }
 
         ComponentDebugger? Debugger { get; set; }
         Guid Id { get; set; }
@@ -46,22 +46,28 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         T? Value { get; set; }
         EventCallback<T?> ValueChanged { get; set; }
     }
-    public abstract class HtmlElementComponent : ComponentBase, IHtmlElementComponent
+    public abstract partial class HtmlElementComponent : ComponentBase, IHtmlElementComponent
     {
-        [Parameter]
-        public string? AdditionalCssClass { get; set; }
+        //[Parameter]
+        //public string? AdditionalCssClass { get; set; }
 
-        [Parameter]
-        public string? AdditionalCssStyle { get; set; }
+        //[Parameter]
+        //public string? AdditionalCssStyle { get; set; }
 
         [Parameter]
         public RenderFragment? ChildContent { get; set; }
 
-        [Parameter]
-        public string? CssClass { get; set; }
 
-        [Parameter]
-        public string? CssStyle { get; set; }
+        //public string? CssClass { get; set; }
+
+
+
+        //public IEnumerable<string> CssClasses => _cssClasses;
+
+
+
+        //[Parameter]
+        //public string? CssStyle { get; set; }
 
         public event Action? ContentChanged;
 
@@ -113,13 +119,13 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             SetName("HtmlElementComponent");
         }
 
-        public virtual string GetElementCssClass() =>
-                                $"{CssClass + AdditionalCssClass}" +
-                                $"{(IsDisabled ? "opacity-50 cursor-not-allowed" : "")} " +
-                                $"{(IsReadonly ? "bg-light" : "")}".Trim();
+        //public virtual string GetElementCssClass() =>
+        //                        $"{CssClass + AdditionalCssClass}" +
+        //                        $"{(IsDisabled ? "opacity-50 cursor-not-allowed" : "")} " +
+        //                        $"{(IsReadonly ? "bg-light" : "")}".Trim();
 
-        public virtual string GetElementCssStyle() =>
-                                $"{CssStyle + AdditionalCssStyle} ";
+        //public virtual string GetElementCssStyle() =>
+        //                        $"{CssStyle + AdditionalCssStyle} ";
 
 
         public virtual string GetElementId() =>
@@ -130,8 +136,9 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         {
             if (Debugger == null) return;
 
-            Debugger.Set("AdditionalCssStyle", AdditionalCssStyle);
-            Debugger.Set("CssStyle", CssStyle);
+            //Debugger.Set("AdditionalCssStyle", AdditionalCssStyle);
+            Debugger.Set("CssClass",GetCssClass());
+            Debugger.Set("CssStyle", GetCssStyle());
             Debugger.Set("Id", Id);
             Debugger.Set("IsDisabled", IsDisabled);
             Debugger.Set("IsReadonly", IsReadonly);
@@ -142,12 +149,12 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             Debugger.Set("Placeholder", Placeholder);
         }
 
-        public HtmlElementComponent SetAdditionalCssStyle(string additionalCssStyle)
-        {
-            AdditionalCssStyle = additionalCssStyle;
+        //public HtmlElementComponent SetAdditionalCssStyle(string additionalCssStyle)
+        //{
+        //    AdditionalCssStyle = additionalCssStyle;
 
-            return this;
-        }
+        //    return this;
+        //}
 
         public HtmlElementComponent SetContent(RenderFragment content)
         {
@@ -158,12 +165,19 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             return this;
         }
 
-        public HtmlElementComponent SetCssStyle(string cssStyle)
-        {
-            CssStyle = cssStyle;
+        //public HtmlElementComponent SetCssClass(string cssClass)
+        //{
+        //    CssClass = cssClass;
 
-            return this;
-        }
+        //    return this;
+        //}
+
+        //public HtmlElementComponent SetCssStyle(string cssStyle)
+        //{
+        //    CssStyle = cssStyle;
+
+        //    return this;
+        //}
 
         public HtmlElementComponent SetDebugger(ComponentDebugger debugger)
         {
@@ -198,7 +212,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
                 if (Debugger == null)
                     Debugger = new ComponentDebugger();
 
-                if (!Debugger.Attributes.Any())
+                if (Debugger.Attributes.Count == 0)
                 {
                     FillDebuggerAttributes();
                 }
@@ -237,7 +251,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
             SetPlaceholder("Leave a comment here");
 
-            SetCssStyle("form-control");
+            AddClass("form-control");
         }
 
 

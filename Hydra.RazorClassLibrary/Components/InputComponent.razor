@@ -22,13 +22,13 @@ else
     {
         if (!IsVisible) return;
 
-        <input class="@GetElementCssClass()"
+        <input class="@GetCssClass()"
                disabled="@IsDisabled"
                id="@GetElementId()"
                @onchange="@OnChange"
                placeholder="@Placeholder"
                readonly="@IsReadonly"
-               style="@GetElementCssStyle()"
+               style="@GetCssStyle()"
                type="@TypeName"
                value="@(typeof(T) != typeof(bool) ? Value : null)" />
         ;

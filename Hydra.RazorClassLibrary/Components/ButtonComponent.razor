@@ -8,11 +8,11 @@
     {
         if (!IsVisible) return;
 
-        <button class="@GetElementCssClass()"
+        <button class="@GetCssClass()"
                 disabled="@IsDisabled"
                 id="@GetElementId()"
                 @onclick="@OnClick"
-                style="@GetElementCssStyle()"
+                style="@GetCssStyle()"
                 type="button">
             @Text
         </button>

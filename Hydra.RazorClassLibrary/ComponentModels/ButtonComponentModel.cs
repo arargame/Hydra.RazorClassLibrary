@@ -23,7 +23,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
             SetName("Button");
 
-            SetCssStyle("btn btn-primary btn-sm");
+            AddClass("btn btn-primary btn-sm");
         }
 
         public IHtmlElementWithText SetText(string text)

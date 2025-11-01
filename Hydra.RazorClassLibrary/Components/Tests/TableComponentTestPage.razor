@@ -1,0 +1,17 @@
+﻿@page "/table-component-test"
+@using Hydra.RazorClassLibrary.Components
+@using Hydra.RazorClassLibrary.Utils
+
+<TestElementDisplay HeaderTitle="Table Test" Debugger="@Debugger">
+    <TableComponent Debugger="@Debugger"
+                       IsTested="true"/>
+</TestElementDisplay>
+
+@code {
+    private ComponentDebugger Debugger = new();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+}

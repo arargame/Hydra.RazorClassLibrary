@@ -70,7 +70,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
             SetLabelValue("Input with value");
 
-            SetCssStyle("form-control");
+            AddClass("form-control");
         }
 
 

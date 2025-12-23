@@ -1,0 +1,112 @@
+@typeparam T where T : class
+@using Hydra.RazorClassLibrary.Services.Core
+@using Hydra.DTOs
+@using Hydra.RazorClassLibrary.Components.Grids
+
+@if (Table == null)
+{
+    <div>Loading...</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>@Title</h3>
+             @if (ShowCreateButton)
+             {
+                 <button class="btn btn-primary" @onclick="GoToCreate">
+                     <i class="bi bi-plus-lg"></i> Yeni Kayıt
+                 </button>
+             }
+        </div>
+        <div class="card-body">
+            <HydraGrid Table="@Table" TableChanged="OnTableChanged" HasActions="true">
+                <ChildContent Context="row">
+                     <!-- Default Actions -->
+                     <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => GoToDetails(row.Id)">
+                         <i class="bi bi-eye"></i>
+                     </button>
+                     <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => GoToUpdate(row.Id)">
+                         <i class="bi bi-pencil"></i>
+                     </button>
+                     <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete(row.Id)">
+                         <i class="bi bi-trash"></i>
+                     </button>
+                </ChildContent>
+            </HydraGrid>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] public NavigationManager Navigation { get; set; } = default!;
+
+    [Parameter, EditorRequired] public ApiClient<T> Client { get; set; } = default!;
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool ShowCreateButton { get; set; } = true;
+    
+    // Optional: Override default navigation paths
+    [Parameter] public string? BasePath { get; set; } 
+
+    private TableDTO? Table { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine($"[GenericListView] OnInitializedAsync for {typeof(T).Name}");
+        if (string.IsNullOrEmpty(Title))
+        {
+            Title = typeof(T).Name + " Listesi";
+        }
+        
+        // Define BasePath if not provided, assuming standard routing /{Controller}
+        if (string.IsNullOrEmpty(BasePath))
+        {
+            BasePath = Client.Controller;
+        }
+
+        await LoadDataAsync();
+        Console.WriteLine($"[GenericListView] OnInitializedAsync Completed. Table is null? {Table == null}");
+    }
+
+    private async Task LoadDataAsync()
+    {
+        // If Table is null, create a default request
+        // If Table exists (e.g. pagination happened), it carries the state
+        var request = Table ?? new TableDTO { Name = Client.Controller, ViewType = Hydra.DTOs.ViewDTOs.ViewType.ListView };
+        
+        Console.WriteLine($"[GenericListView] Calling Client.SelectAsync for {request.Name}...");
+        Table = await Client.SelectAsync(request);
+        Console.WriteLine($"[GenericListView] Client.SelectAsync returned. Table Rows: {Table?.Rows?.Count ?? 0}");
+    }
+
+    private async Task OnTableChanged(TableDTO updatedTable)
+    {
+        Table = updatedTable;
+        await LoadDataAsync();
+    }
+
+    private void GoToCreate()
+    {
+        Navigation.NavigateTo($"/{BasePath}/Create");
+    }
+
+    private void GoToDetails(Guid id)
+    {
+        Navigation.NavigateTo($"/{BasePath}/Details/{id}");
+    }
+
+    private void GoToUpdate(Guid id)
+    {
+        Navigation.NavigateTo($"/{BasePath}/Update/{id}");
+    }
+
+    private async Task OnDelete(Guid id)
+    {
+        // TODO: Add Confirmation Dialog logic here
+        var success = await Client.DeleteAsync(id);
+        if (success)
+        {
+            await LoadDataAsync();
+        }
+    }
+}

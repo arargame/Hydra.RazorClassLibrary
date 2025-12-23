@@ -1,0 +1,128 @@
+@using Hydra.DTOs
+ 
+
+@if (Table == null)
+{
+    <div>Loading...</div>
+}
+else
+{
+    @if(Table.Rows.Count == 0)
+    {
+         <div class="alert alert-info">Kayıt bulunamadı.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                         @foreach (var column in Table.GetSelectedMetaColumnsExceptPrimaryKeyWithIncludes.OrderBy(mc => mc.Priority))
+                         {
+                             <th scope="col" @onclick="() => OnSort(column)" style="@(column.IsOrderable ? "cursor:pointer" : "")">
+                                 @column.DisplayName
+                                 @if (column.IsOrdered)
+                                 {
+                                     <span>@(column.Direction == Hydra.DataModels.SortingDirection.Ascending ? "🔼" : "🔽")</span>
+                                 }
+                             </th>
+                         }
+                         @if(HasActions)
+                         {
+                             <th>İşlemler</th>
+                         }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Table.Rows)
+                    {
+                        var rowData = row.ToObject<object>(); 
+                        // Note: Using ToObject<object> might return a generic object that behaves like a dictionary or dynamic depending on implementation.
+                        // Actually TableDTO.Rows implies RowDTO, which has generic casting capabilities.
+                        // For display, we might need a way to extract value by column name dynamically from RowDTO or the deserialized object.
+                        // RowDTO usually holds data in a way we can extract. Let's assume RowDTO has a helper or we use reflection on T.
+                        
+                        <tr>
+                            @foreach (var column in Table.GetSelectedMetaColumnsExceptPrimaryKeyWithIncludes.OrderBy(mc => mc.Priority))
+                            {
+                                <td>
+                                    @row.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name)
+                                </td>
+                            }
+                            
+                            @if(HasActions)
+                            {
+                                <td>
+                                    @ChildContent?.Invoke(row)
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination PlaceHolder -->
+        @if(Table.TotalPagesCount > 1)
+        {
+            <div class="d-flex justify-content-center">
+                 <!-- Simple Pagination UI for now -->
+                 <button class="btn btn-sm btn-outline-secondary" disabled="@(Table.PageNumber <= 1)" @onclick="PrevPage">Prev</button>
+                 <span class="mx-2">Sayfa @Table.PageNumber / @Table.TotalPagesCount</span>
+                 <button class="btn btn-sm btn-outline-secondary" disabled="@(Table.PageNumber >= Table.TotalPagesCount)" @onclick="NextPage">Next</button>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter] public TableDTO? Table { get; set; }
+    [Parameter] public EventCallback<TableDTO> TableChanged { get; set; }
+    [Parameter] public RenderFragment<RowDTO>? ChildContent { get; set; } // For Action Buttons
+    [Parameter] public bool HasActions { get; set; } = true;
+
+    private async Task OnSort(MetaColumnDTO column)
+    {
+        if (!column.IsOrderable) return;
+
+        // Toggle sort logic would go here
+        // Ideally we update the column inside Table and trigger TableChanged
+        // For simplified MVP:
+        
+        var existingSort = Table.GetOrderedMetaColumns.FirstOrDefault(c => c.Name == column.Name);
+        if(existingSort != null)
+        {
+             // Flip direction
+             existingSort.Direction = existingSort.Direction == Hydra.DataModels.SortingDirection.Ascending 
+                ? Hydra.DataModels.SortingDirection.Descending 
+                : Hydra.DataModels.SortingDirection.Ascending;
+        }
+        else
+        {
+             // Add new sort
+             column.IsOrdered = true;
+             column.Direction = Hydra.DataModels.SortingDirection.Ascending;
+             Table.AlterOrAddMetaColumn(column);
+        }
+        
+        await TableChanged.InvokeAsync(Table);
+    }
+
+    private async Task PrevPage()
+    {
+        if(Table.PageNumber > 1)
+        {
+            Table.PageNumber--;
+            await TableChanged.InvokeAsync(Table);
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if(Table.PageNumber < Table.TotalPagesCount)
+        {
+            Table.PageNumber++;
+            await TableChanged.InvokeAsync(Table);
+        }
+    }
+}

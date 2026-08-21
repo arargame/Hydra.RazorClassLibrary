@@ -1,0 +1,120 @@
+@* Sayfalama componenti: sayfa numaraları + sayfa boyutu seçici.
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+<div class="hydra-pagination">
+    <div class="hydra-pagination__info">
+        @if (TotalRecordsCount > 0)
+        {
+            <span>Toplam <strong>@TotalRecordsCount</strong> kayıt@(FilteredTotalRecordsCount != TotalRecordsCount ? $", filtrelenen: {FilteredTotalRecordsCount}" : "")</span>
+        }
+    </div>
+
+    @if (TotalPagesCount > 1)
+    {
+        <nav class="hydra-pagination__nav">
+            <ul class="hydra-pagination__pages">
+                <li>
+                    <button type="button"
+                            class="hydra-pagination__btn hydra-pagination__btn--nav @(PageNumber <= 1 ? "hydra-pagination__btn--disabled" : "")"
+                            disabled="@(PageNumber <= 1)"
+                            @onclick="() => GoToPage(PageNumber - 1)">
+                        <i class="hydra-icon bi bi-chevron-left"></i>
+                    </button>
+                </li>
+
+                @foreach (var pageNo in GetVisiblePages())
+                {
+                    var currentPageNo = pageNo;
+
+                    if (currentPageNo == -1)
+                    {
+                        <li><span class="hydra-pagination__ellipsis">…</span></li>
+                    }
+                    else
+                    {
+                        <li>
+                            <button type="button"
+                                    class="hydra-pagination__btn @(currentPageNo == PageNumber ? "hydra-pagination__btn--active" : "")"
+                                    @onclick="() => GoToPage(currentPageNo)">
+                                @currentPageNo
+                            </button>
+                        </li>
+                    }
+                }
+
+                <li>
+                    <button type="button"
+                            class="hydra-pagination__btn hydra-pagination__btn--nav @(PageNumber >= TotalPagesCount ? "hydra-pagination__btn--disabled" : "")"
+                            disabled="@(PageNumber >= TotalPagesCount)"
+                            @onclick="() => GoToPage(PageNumber + 1)">
+                        <i class="hydra-icon bi bi-chevron-right"></i>
+                    </button>
+                </li>
+            </ul>
+        </nav>
+    }
+
+    @if (ShowPageSizeSelector)
+    {
+        <div class="hydra-pagination__size">
+            <span class="hydra-pagination__size-label">Sayfa boyutu</span>
+            <select class="hydra-select hydra-pagination__size-select" value="@PageSize" @onchange="OnPageSizeChanged">
+                @foreach (var size in PageSizeOptions)
+                {
+                    <option value="@size">@size</option>
+                }
+            </select>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public int TotalPagesCount { get; set; }
+    [Parameter] public int TotalRecordsCount { get; set; }
+    [Parameter] public int FilteredTotalRecordsCount { get; set; }
+    [Parameter] public bool ShowPageSizeSelector { get; set; } = true;
+    [Parameter] public int[] PageSizeOptions { get; set; } = new[] { 5, 10, 25, 50, 100 };
+
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+    [Parameter] public EventCallback<int> PageSizeChanged { get; set; }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPagesCount || page == PageNumber)
+            return;
+
+        await PageChanged.InvokeAsync(page);
+    }
+
+    private async Task OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size))
+            await PageSizeChanged.InvokeAsync(size);
+    }
+
+    private IEnumerable<int> GetVisiblePages()
+    {
+        const int window = 2;
+
+        var pages = new List<int>();
+
+        for (int i = 1; i <= TotalPagesCount; i++)
+        {
+            var isEdge = i == 1 || i == TotalPagesCount;
+            var isNear = Math.Abs(i - PageNumber) <= window;
+
+            if (isEdge || isNear)
+            {
+                pages.Add(i);
+            }
+            else if (pages.Count > 0 && pages[^1] != -1)
+            {
+                pages.Add(-1); // ellipsis işareti
+            }
+        }
+
+        return pages;
+    }
+}

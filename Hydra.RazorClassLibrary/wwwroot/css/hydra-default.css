@@ -1,0 +1,847 @@
+/* ============================================================================
+   Hydra RazorClassLibrary — VARSAYILAN (nötr) tema
+   ----------------------------------------------------------------------------
+   Bu dosya, RCL bileşenlerinin (HydraGrid, GenericListView, FilterBar,
+   Pagination, Spinner) hiçbir CSS framework'ü olmadan makul görünmesi için
+   yazılmış nötr bir varsayılandır. Bileşenlerin markup'ı Bootstrap/Tailwind gibi
+   bir kütüphaneye bağlı DEĞİLDİR; sadece anlamsal "hydra-*" class'ları basar.
+
+   Host proje bu dosyayı referans verip üzerine yazabilir, ya da hiç almayıp
+   tamamen kendi temasını yazabilir (bkz. Tentacle'daki tentacle-theme.css).
+
+   Kullanım (host projenin App.razor / index.html dosyasında):
+       <link rel="stylesheet" href="_content/Hydra.RazorClassLibrary/css/hydra-default.css" />
+
+   Bütün renk/ölçü değerleri CSS değişkeni olarak tanımlıdır; bir projenin temayı
+   değiştirmesi için çoğu zaman sadece :root altındaki değişkenleri ezmesi yeterlidir.
+   ============================================================================ */
+
+:root {
+    --hydra-bg:               #ffffff;
+    --hydra-bg-subtle:        #f8f9fa;
+    --hydra-bg-hover:         #f1f3f5;
+    --hydra-surface:          #ffffff;
+    --hydra-border:           #dee2e6;
+    --hydra-border-strong:    #ced4da;
+
+    --hydra-text:             #212529;
+    --hydra-text-muted:       #6c757d;
+
+    --hydra-primary:          #0d6efd;
+    --hydra-on-primary:       #ffffff;
+    --hydra-create:           #198754;
+    --hydra-edit:             #0d6efd;
+    --hydra-delete:           #dc3545;
+    --hydra-details:          #0dcaf0;
+
+    --hydra-radius:           0.375rem;
+    --hydra-radius-sm:        0.25rem;
+    --hydra-gap:              0.5rem;
+    --hydra-pad:              0.75rem;
+    --hydra-font-sm:          0.875rem;
+}
+
+/* ---------------------------------------------------------------- ListView */
+
+.hydra-listview {
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    overflow: hidden;
+}
+
+.hydra-listview__header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hydra-gap);
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--hydra-pad) 1rem;
+    border-bottom: 1px solid var(--hydra-border);
+    background: var(--hydra-bg-subtle);
+}
+
+.hydra-listview__title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--hydra-text);
+}
+
+.hydra-listview__actions {
+    display: flex;
+    gap: var(--hydra-gap);
+    align-items: center;
+}
+
+.hydra-listview__body { padding: 1rem; }
+
+/* ----------------------------------------------------------------- Buttons */
+
+.hydra-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: var(--hydra-font-sm);
+    line-height: 1.4;
+    border-radius: var(--hydra-radius-sm);
+    border: 1px solid var(--hydra-border-strong);
+    background: transparent;
+    color: var(--hydra-text);
+    cursor: pointer;
+    transition: background-color .15s, border-color .15s, color .15s;
+}
+
+.hydra-btn:hover           { background: var(--hydra-bg-hover); }
+.hydra-btn:disabled        { opacity: .5; cursor: not-allowed; }
+
+.hydra-btn--icon           { padding: 0.25rem 0.5rem; }
+
+.hydra-btn--primary        { background: var(--hydra-primary); border-color: var(--hydra-primary); color: var(--hydra-on-primary); }
+.hydra-btn--primary:hover  { filter: brightness(1.08); background: var(--hydra-primary); }
+
+.hydra-btn--create         { background: var(--hydra-create); border-color: var(--hydra-create); color: #fff; }
+.hydra-btn--create:hover   { filter: brightness(1.08); background: var(--hydra-create); }
+
+/* Aksiyon renk konvansiyonu: Düzenle = mavi, Sil = kırmızı, Detay = turkuaz */
+.hydra-btn--edit           { border-color: var(--hydra-edit);    color: var(--hydra-edit); }
+.hydra-btn--edit:hover     { background: var(--hydra-edit);      color: #fff; }
+
+.hydra-btn--delete         { border-color: var(--hydra-delete);  color: var(--hydra-delete); }
+.hydra-btn--delete:hover   { background: var(--hydra-delete);    color: #fff; }
+
+.hydra-btn--details        { border-color: var(--hydra-details); color: var(--hydra-details); }
+.hydra-btn--details:hover  { background: var(--hydra-details);   color: #fff; }
+
+.hydra-btn--secondary      { border-color: var(--hydra-border-strong); color: var(--hydra-text-muted); }
+.hydra-btn--ghost          { border-color: transparent; color: var(--hydra-text-muted); }
+.hydra-btn--active         { background: var(--hydra-bg-hover); color: var(--hydra-text); }
+
+/* ------------------------------------------------------------ Inputs */
+
+.hydra-input,
+.hydra-select {
+    padding: 0.375rem 0.625rem;
+    font-size: var(--hydra-font-sm);
+    line-height: 1.4;
+    color: var(--hydra-text);
+    background: var(--hydra-bg);
+    border: 1px solid var(--hydra-border-strong);
+    border-radius: var(--hydra-radius-sm);
+    width: 100%;
+}
+
+.hydra-input:focus,
+.hydra-select:focus {
+    outline: none;
+    border-color: var(--hydra-primary);
+}
+
+/* -------------------------------------------------------------- FilterBar */
+
+.hydra-filterbar {
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    background: var(--hydra-bg-subtle);
+    padding: 1rem;
+    margin: 0 1rem 1rem;
+}
+
+.hydra-filterbar__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--hydra-pad);
+}
+
+.hydra-filterbar__field { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.hydra-filterbar__label {
+    font-size: 0.75rem;
+    color: var(--hydra-text-muted);
+}
+
+.hydra-filterbar__range { display: flex; align-items: center; gap: 0.375rem; }
+.hydra-filterbar__range-sep { color: var(--hydra-text-muted); }
+
+.hydra-filterbar__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--hydra-gap);
+    margin-top: var(--hydra-pad);
+}
+
+/* ------------------------------------------------------------------- Grid */
+
+.hydra-grid { display: flex; flex-direction: column; }
+
+.hydra-grid__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hydra-gap);
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--hydra-gap);
+}
+
+.hydra-grid__search { position: relative; max-width: 320px; width: 100%; }
+
+.hydra-grid__search-icon {
+    position: absolute;
+    left: 0.625rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--hydra-text-muted);
+    pointer-events: none;
+}
+
+.hydra-grid__search-input { padding-left: 2rem; }
+
+.hydra-grid__count {
+    font-size: 0.75rem;
+    color: var(--hydra-text-muted);
+    white-space: nowrap;
+}
+
+.hydra-grid__scroll { overflow-x: auto; }
+
+.hydra-grid__table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.hydra-grid__th {
+    padding: var(--hydra-pad);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--hydra-text-muted);
+    background: var(--hydra-bg-subtle);
+    border-bottom: 1px solid var(--hydra-border);
+    white-space: nowrap;
+}
+
+.hydra-grid__th--sortable { cursor: pointer; user-select: none; }
+.hydra-grid__th--sortable:hover { color: var(--hydra-text); }
+.hydra-grid__th--details { width: 1%; }
+.hydra-grid__th--actions { text-align: right; }
+
+.hydra-grid__sort-icon { margin-left: 0.25rem; font-size: 0.75rem; }
+
+.hydra-grid__row { border-bottom: 1px solid var(--hydra-border); }
+.hydra-grid__row:hover { background: var(--hydra-bg-hover); }
+
+.hydra-grid__cell {
+    padding: var(--hydra-pad);
+    font-size: var(--hydra-font-sm);
+    color: var(--hydra-text);
+    vertical-align: middle;
+}
+
+.hydra-grid__cell--details { width: 1%; white-space: nowrap; }
+.hydra-grid__cell--actions { text-align: right; white-space: nowrap; }
+.hydra-grid__cell--actions .hydra-btn + .hydra-btn { margin-left: 0.25rem; }
+
+.hydra-grid__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    font-size: var(--hydra-font-sm);
+    color: var(--hydra-text-muted);
+    background: var(--hydra-bg-subtle);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius-sm);
+}
+
+/* ------------------------------------------------------------- Pagination */
+
+.hydra-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hydra-gap);
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--hydra-pad);
+}
+
+.hydra-pagination__info { font-size: 0.75rem; color: var(--hydra-text-muted); }
+
+.hydra-pagination__pages {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.hydra-pagination__btn {
+    min-width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.375rem;
+    font-size: var(--hydra-font-sm);
+    color: var(--hydra-text);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--hydra-radius-sm);
+    cursor: pointer;
+}
+
+.hydra-pagination__btn:hover:not(:disabled) { background: var(--hydra-bg-hover); }
+.hydra-pagination__btn--active { background: var(--hydra-primary); color: var(--hydra-on-primary); }
+.hydra-pagination__btn--disabled,
+.hydra-pagination__btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.hydra-pagination__ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    color: var(--hydra-text-muted);
+}
+
+.hydra-pagination__size { display: flex; align-items: center; gap: 0.375rem; }
+.hydra-pagination__size-label { font-size: 0.75rem; color: var(--hydra-text-muted); }
+.hydra-pagination__size-select { width: auto; }
+
+/* ---------------------------------------------------------------- Spinner */
+
+.hydra-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 2rem;
+    color: var(--hydra-text-muted);
+    font-size: var(--hydra-font-sm);
+}
+
+.hydra-spinner__ring {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--hydra-border);
+    border-top-color: var(--hydra-primary);
+    border-radius: 50%;
+    animation: hydra-spin .7s linear infinite;
+}
+
+@keyframes hydra-spin { to { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   Form (GenericFormView / ColumnFieldComponent)
+   ========================================================================== */
+
+.hydra-form {
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    overflow: hidden;
+    max-width: 56rem;
+    margin: 0 auto;
+}
+
+.hydra-form__alert {
+    padding: 1rem;
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    background: var(--hydra-bg-subtle);
+    color: var(--hydra-text-muted);
+}
+
+/* Hata bandı — kaydetme başarısız olduğunda formun üstünde belirir */
+.hydra-form__banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--hydra-delete);
+    background: color-mix(in srgb, var(--hydra-delete) 12%, transparent);
+}
+
+.hydra-form__banner-icon { color: var(--hydra-delete); font-size: 1.125rem; }
+.hydra-form__banner-title { margin: 0; font-size: var(--hydra-font-sm); font-weight: 600; color: var(--hydra-delete); }
+.hydra-form__banner-text { margin: 0.25rem 0 0; font-size: var(--hydra-font-sm); color: var(--hydra-text-muted); }
+
+.hydra-form__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--hydra-border);
+    background: var(--hydra-bg-subtle);
+}
+
+.hydra-form__title { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--hydra-text); }
+.hydra-form__subtitle { margin: 0.5rem 0 0; font-size: var(--hydra-font-sm); color: var(--hydra-text-muted); }
+
+.hydra-form__body { padding: 1.5rem; }
+
+.hydra-form__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.25rem;
+}
+
+.hydra-form__field { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.hydra-form__field--wide { grid-column: 1 / -1; }
+
+.hydra-form__label-row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+
+.hydra-form__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--hydra-font-sm);
+    font-weight: 500;
+    color: var(--hydra-text);
+}
+
+.hydra-form__required { color: var(--hydra-delete); }
+
+.hydra-form__badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid var(--hydra-border-strong);
+    color: var(--hydra-text-muted);
+    white-space: nowrap;
+}
+
+.hydra-form__footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--hydra-border);
+    background: var(--hydra-bg-subtle);
+}
+
+.hydra-btn--edit-save { background: var(--hydra-edit); border-color: var(--hydra-edit); color: #fff; }
+.hydra-btn--edit-save:hover { filter: brightness(1.08); background: var(--hydra-edit); }
+
+.hydra-btn__spinner {
+    width: 0.875rem;
+    height: 0.875rem;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    animation: hydra-spin .7s linear infinite;
+}
+
+/* Alan sarmalayıcı: input + sağdaki ikon (takvim / açılır ok) */
+.hydra-field { position: relative; display: flex; align-items: center; }
+
+.hydra-field__affix {
+    position: absolute;
+    right: 0.75rem;
+    color: var(--hydra-text-muted);
+    pointer-events: none;
+    font-size: 0.75rem;
+}
+
+.hydra-textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font: inherit;
+    font-size: var(--hydra-font-sm);
+    color: var(--hydra-text);
+    background: var(--hydra-bg);
+    border: 1px solid var(--hydra-border-strong);
+    border-radius: var(--hydra-radius-sm);
+    resize: vertical;
+}
+
+.hydra-textarea:focus { outline: none; border-color: var(--hydra-primary); }
+
+.hydra-input:disabled,
+.hydra-select:disabled,
+.hydra-textarea:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Boolean alanlar için anahtar (switch) */
+.hydra-switch { display: inline-flex; align-items: center; cursor: pointer; }
+.hydra-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.hydra-switch__track {
+    width: 2.5rem;
+    height: 1.375rem;
+    border-radius: 9999px;
+    background: var(--hydra-border);
+    position: relative;
+    transition: background-color .15s;
+}
+
+.hydra-switch__track::after {
+    content: "";
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform .15s;
+}
+
+.hydra-switch input:checked + .hydra-switch__track { background: var(--hydra-primary); }
+.hydra-switch input:checked + .hydra-switch__track::after { transform: translateX(1.125rem); }
+.hydra-switch input:disabled + .hydra-switch__track { opacity: .6; cursor: not-allowed; }
+
+/* ==========================================================================
+   Modal'lar (ConfirmDialogComponent / LookupModalComponent)
+   ========================================================================== */
+
+.hydra-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, .5);
+}
+
+.hydra-modal {
+    width: 100%;
+    max-width: 25rem;
+    display: flex;
+    flex-direction: column;
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-border);
+    border-top: 2px solid var(--hydra-primary);
+    border-radius: var(--hydra-radius);
+    overflow: hidden;
+}
+
+/* Varyantlar: onaylanan işlemin rengini üst çizgi ve onay butonu taşır */
+.hydra-modal--danger  { border-top-color: var(--hydra-delete); }
+.hydra-modal--primary { border-top-color: var(--hydra-primary); }
+.hydra-modal--success { border-top-color: var(--hydra-create); }
+
+.hydra-modal__header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--hydra-border);
+    background: var(--hydra-bg-subtle);
+}
+
+.hydra-modal__title { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--hydra-text); flex: 1; }
+
+.hydra-modal--danger  .hydra-modal__header-icon { color: var(--hydra-delete); }
+.hydra-modal--primary .hydra-modal__header-icon { color: var(--hydra-primary); }
+.hydra-modal--success .hydra-modal__header-icon { color: var(--hydra-create); }
+
+.hydra-modal__close {
+    background: transparent;
+    border: none;
+    color: var(--hydra-text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+}
+
+.hydra-modal__close:hover { color: var(--hydra-text); }
+
+.hydra-modal__body { padding: 1.25rem; }
+.hydra-modal__text { margin: 0; font-size: var(--hydra-font-sm); color: var(--hydra-text-muted); }
+
+.hydra-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-top: 1px solid var(--hydra-border);
+    background: var(--hydra-bg-subtle);
+}
+
+.hydra-modal__confirm {
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: .03em;
+    border-color: transparent;
+}
+
+.hydra-modal--danger  .hydra-modal__confirm { background: var(--hydra-delete);  color: #fff; }
+.hydra-modal--primary .hydra-modal__confirm { background: var(--hydra-primary); color: var(--hydra-on-primary); }
+.hydra-modal--success .hydra-modal__confirm { background: var(--hydra-create);  color: #fff; }
+.hydra-modal__confirm:hover:not(:disabled) { filter: brightness(1.1); }
+
+/* ------------------------------------------------------------ Lookup modal */
+
+.hydra-lookup { max-width: 37.5rem; height: min(600px, 85vh); }
+
+.hydra-lookup__search-bar {
+    padding: 1rem;
+    border-bottom: 1px solid var(--hydra-border);
+    background: var(--hydra-bg);
+}
+
+.hydra-lookup__search { position: relative; display: flex; align-items: center; }
+
+.hydra-lookup__search-icon {
+    position: absolute;
+    left: 0.625rem;
+    color: var(--hydra-text-muted);
+    pointer-events: none;
+}
+
+.hydra-lookup__search-input { padding-left: 2rem; }
+
+.hydra-lookup__list-wrap { flex: 1; overflow-y: auto; padding: 0.5rem; }
+
+.hydra-lookup__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+
+.hydra-lookup__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius-sm);
+    cursor: pointer;
+    color: var(--hydra-text);
+    transition: background-color .15s, border-color .15s;
+}
+
+.hydra-lookup__item:hover { background: var(--hydra-bg-hover); }
+
+.hydra-lookup__item--selected {
+    border-color: var(--hydra-primary);
+    background: color-mix(in srgb, var(--hydra-primary) 10%, transparent);
+    font-weight: 600;
+}
+
+.hydra-lookup__item-check { color: var(--hydra-primary); }
+
+.hydra-lookup__empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    font-size: var(--hydra-font-sm);
+    color: var(--hydra-text-muted);
+}
+
+/* ==========================================================================
+   Details (GenericDetailsView) + Collection (CollectionViewSection)
+   ========================================================================== */
+
+.hydra-details { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.hydra-details__empty {
+    padding: 1rem;
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    background: var(--hydra-bg-subtle);
+    color: var(--hydra-text-muted);
+}
+
+/* ------------------------------------------------------------ Başlık kartı */
+
+.hydra-details__header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+}
+
+.hydra-details__heading { min-width: 0; }
+
+.hydra-details__eyebrow-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+
+.hydra-details__eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--hydra-primary);
+}
+
+.hydra-details__dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--hydra-primary);
+    flex-shrink: 0;
+}
+
+.hydra-details__state {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid var(--hydra-border-strong);
+    color: var(--hydra-text-muted);
+}
+
+.hydra-details__title {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--hydra-text);
+    word-break: break-word;
+}
+
+.hydra-details__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* ------------------------------------------------------------- Özet kartı */
+
+.hydra-details__summary {
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    overflow: hidden;
+}
+
+.hydra-details__summary-header {
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--hydra-border);
+    background: var(--hydra-bg-subtle);
+}
+
+.hydra-details__summary-title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--hydra-text); }
+
+.hydra-details__summary-body {
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.hydra-details__pair { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+
+.hydra-details__pair-label {
+    font-size: 0.75rem;
+    color: var(--hydra-text-muted);
+}
+
+.hydra-details__pair-value {
+    font-size: var(--hydra-font-sm);
+    color: var(--hydra-text);
+    word-break: break-word;
+}
+
+.hydra-details__link { color: var(--hydra-primary); }
+
+/* ------------------------------------------------------------ Sekme kartı */
+
+.hydra-details__tabs-card {
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.hydra-details__tabstrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--hydra-border);
+}
+
+.hydra-details__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 1rem;
+    font-size: var(--hydra-font-sm);
+    font-weight: 500;
+    color: var(--hydra-text-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: color .15s, border-color .15s, background-color .15s;
+}
+
+.hydra-details__tab:hover { color: var(--hydra-text); }
+
+.hydra-details__tab--active {
+    color: var(--hydra-primary);
+    border-bottom-color: var(--hydra-primary);
+    font-weight: 700;
+}
+
+.hydra-details__tab-count { opacity: .8; }
+
+.hydra-details__tabpanels { padding: 1.5rem; }
+
+/* --------------------------------------------------------- Collection view */
+
+.hydra-collection { display: flex; flex-direction: column; gap: 1rem; }
+.hydra-collection--hidden { display: none; }
+
+/* Tek başına (sekme dışında) kullanıldığında kendi kartını çizer */
+.hydra-collection--standalone {
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius);
+    gap: 0;
+    margin-bottom: 1.5rem;
+}
+
+.hydra-collection--standalone .hydra-collection__header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--hydra-border);
+    background: var(--hydra-bg-subtle);
+}
+
+.hydra-collection--standalone .hydra-collection__body { padding: 1rem; }
+
+.hydra-collection__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hydra-collection__title {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--hydra-text);
+}
+
+/* Sekme içindeki kompakt tablo */
+.hydra-collection__body .hydra-grid__scroll {
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius-sm);
+    overflow: hidden;
+}
+
+.hydra-collection__body .hydra-grid__th,
+.hydra-collection__body .hydra-grid__cell { padding: 0.5rem 0.75rem; }
+
+.hydra-btn--add {
+    border-color: var(--hydra-primary);
+    color: var(--hydra-primary);
+    background: transparent;
+    text-decoration: none;
+}
+
+.hydra-btn--add:hover { background: var(--hydra-bg-hover); color: var(--hydra-primary); }

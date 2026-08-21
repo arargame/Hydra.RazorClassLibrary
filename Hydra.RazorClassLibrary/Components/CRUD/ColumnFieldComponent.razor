@@ -1,0 +1,134 @@
+@using Hydra.DTOs
+@using Hydra.DataModels
+
+@* Katman-2 component: MetaColumnDTO'nun HtmlElementType/HtmlInputType metasına göre doğru primitifi render eder.
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+@switch (Column.HtmlElementType)
+{
+    case HtmlElementType.DropdownList:
+    case HtmlElementType.DataList:
+        <div class="hydra-field">
+            <select class="hydra-select" id="@FieldId" disabled="@IsDisabled" @onchange="OnRawChanged">
+                @foreach (var option in Options ?? new List<DropdownListOption>())
+                {
+                    <option value="@option.Key" selected="@(option.Key == CurrentStringValue)">@option.Value</option>
+                }
+            </select>
+            <i class="hydra-icon hydra-field__affix bi bi-chevron-down"></i>
+        </div>
+        break;
+
+    case HtmlElementType.TextArea:
+        <div class="hydra-field">
+            <textarea class="hydra-textarea" id="@FieldId" rows="3" disabled="@IsDisabled"
+                      placeholder="@Placeholder" @onchange="OnRawChanged">@CurrentStringValue</textarea>
+        </div>
+        break;
+
+    case HtmlElementType.RichTextEditor:
+        <div class="hydra-field">
+            <textarea class="hydra-textarea" id="@FieldId" rows="6" disabled="@IsDisabled"
+                      placeholder="@Placeholder" @onchange="OnRawChanged">@CurrentStringValue</textarea>
+        </div>
+        break;
+
+    case HtmlElementType.InputToUploadFile:
+        <div class="hydra-field">
+            <input class="hydra-input" id="@FieldId" type="file" disabled="@IsDisabled" />
+        </div>
+        break;
+
+    default:
+        @if (Column.HtmlInputType == HtmlInputType.checkbox || Column.ValueType == ColumnValueType.Boolean)
+        {
+            <label class="hydra-switch">
+                <input type="checkbox" id="@FieldId" disabled="@IsDisabled"
+                       checked="@IsChecked" @onchange="OnRawChanged" />
+                <span class="hydra-switch__track"></span>
+            </label>
+        }
+        else
+        {
+            <div class="hydra-field">
+                <input class="hydra-input" id="@FieldId" type="@InputTypeName" disabled="@IsDisabled"
+                       placeholder="@Placeholder" value="@FormattedInputValue" @onchange="OnRawChanged" />
+                @if (IsDateLike)
+                {
+                    <i class="hydra-icon hydra-field__affix bi bi-calendar3"></i>
+                }
+            </div>
+        }
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public MetaColumnDTO Column { get; set; } = default!;
+    [Parameter] public object? Value { get; set; }
+    [Parameter] public EventCallback<object?> ValueChanged { get; set; }
+    [Parameter] public List<DropdownListOption>? Options { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+
+    private string FieldId => $"field-{Column.Name}";
+
+    private bool IsDisabled => Disabled || Column.IsDisabled;
+
+    private string? CurrentStringValue => Value?.ToString();
+
+    private bool IsDateLike => InputTypeName is "date" or "datetime-local";
+
+    private bool IsChecked
+    {
+        get
+        {
+            var s = CurrentStringValue;
+            return s != null && (s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "1");
+        }
+    }
+    private string InputTypeName
+    {
+        get
+        {
+            //ValueType, HtmlInputType'tan daha güvenilir olduğu durumlarda öncelik alır
+            if (Column.HtmlInputType == HtmlInputType.text)
+            {
+                switch (Column.ValueType)
+                {
+                    case ColumnValueType.DateTime: return "datetime-local";
+                    case ColumnValueType.Int:
+                    case ColumnValueType.Double:
+                    case ColumnValueType.Float: return "number";
+                }
+            }
+
+            return Column.HtmlInputType == HtmlInputType.datetime_local
+                        ? "datetime-local"
+                        : Column.HtmlInputType.ToString();
+        }
+    }
+
+    private string? FormattedInputValue
+    {
+        get
+        {
+            if (Value == null)
+                return null;
+
+            if (InputTypeName is "date" or "datetime-local" && DateTime.TryParse(CurrentStringValue, out var date))
+            {
+                return InputTypeName == "date"
+                            ? date.ToString("yyyy-MM-dd")
+                            : date.ToString("yyyy-MM-ddTHH:mm");
+            }
+
+            return CurrentStringValue;
+        }
+    }
+
+    private async Task OnRawChanged(ChangeEventArgs e)
+    {
+        Value = e.Value;
+        await ValueChanged.InvokeAsync(e.Value);
+    }
+}

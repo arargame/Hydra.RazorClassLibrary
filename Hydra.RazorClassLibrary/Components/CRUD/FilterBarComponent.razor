@@ -1,0 +1,201 @@
+@using Hydra.DTOs
+@using Hydra.DataModels
+@using Hydra.DataModels.Filter
+@using Hydra.RazorClassLibrary.Services.Core
+
+@* ListView filtre barı: TableDTO'daki FilteredColumn'lardan otomatik filtre alanları üretir.
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+@if (FilterColumns.Any())
+{
+    <div class="hydra-filterbar">
+        <div class="hydra-filterbar__grid">
+            @foreach (var column in FilterColumns)
+            {
+                <div class="hydra-filterbar__field">
+                    <label class="hydra-filterbar__label">@column.DisplayName</label>
+
+                    @if (IsBetweenFilter(column))
+                    {
+                        <div class="hydra-filterbar__range">
+                            <input class="hydra-input" type="date"
+                                   value="@GetRawValue(column, 0)"
+                                   @onchange="e => SetRawValue(column, 0, e.Value)" />
+                            <span class="hydra-filterbar__range-sep">–</span>
+                            <input class="hydra-input" type="date"
+                                   value="@GetRawValue(column, 1)"
+                                   @onchange="e => SetRawValue(column, 1, e.Value)" />
+                        </div>
+                    }
+                    else if (GetOptions(column) is { } options)
+                    {
+                        <select class="hydra-select"
+                                @onchange="e => SetRawValue(column, 0, e.Value)">
+                            @foreach (var option in options)
+                            {
+                                <option value="@option.Key" selected="@(option.Key == GetRawValue(column, 0))">@option.Value</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input class="hydra-input"
+                               type="@GetInputType(column)"
+                               placeholder="@column.DisplayName"
+                               value="@GetRawValue(column, 0)"
+                               @onchange="e => SetRawValue(column, 0, e.Value)"
+                               @onkeydown="@(e => OnKeyDown(e))" />
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="hydra-filterbar__actions">
+            <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="ClearFilters">
+                <i class="hydra-icon bi bi-x-lg"></i>
+                <span>Temizle</span>
+            </button>
+            <button type="button" class="hydra-btn hydra-btn--primary" @onclick="ApplyFilters">
+                <i class="hydra-icon bi bi-funnel"></i>
+                <span>Filtrele</span>
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] public LookupService Lookup { get; set; } = default!;
+
+    [Parameter, EditorRequired] public TableDTO Table { get; set; } = default!;
+    [Parameter] public EventCallback<TableDTO> TableChanged { get; set; }
+
+    private readonly Dictionary<string, string?[]> _rawValues = new();
+    private readonly Dictionary<string, List<DropdownListOption>> _optionsByField = new();
+
+    private List<MetaColumnDTO> FilterColumns => Table?
+        .GetFilteredMetaColumnsWithIncludes?
+        .Where(c => c.CreateViewComponentFromThis)
+        .ToList() ?? new List<MetaColumnDTO>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        foreach (var column in FilterColumns)
+        {
+            var key = FieldKey(column);
+
+            if (!_rawValues.ContainsKey(key))
+            {
+                //Mevcut filtre değerlerini (state) geri yükle
+                var parameters = column.FilterDTO?.Parameters;
+
+                _rawValues[key] = new[]
+                {
+                    parameters?.ElementAtOrDefault(0)?.Value?.ToString(),
+                    parameters?.ElementAtOrDefault(1)?.Value?.ToString()
+                };
+            }
+
+            if (!_optionsByField.ContainsKey(key))
+            {
+                List<DropdownListOption>? options = null;
+
+                if (column.ValueType == ColumnValueType.Enum)
+                {
+                    options = Lookup.GetEnumOptions(column.PropertyTypeName, addEmptyOption: true);
+                }
+                else if (column.ValueType == ColumnValueType.Boolean)
+                {
+                    options = new List<DropdownListOption>
+                    {
+                        new DropdownListOption(string.Empty, "— Tümü —"),
+                        new DropdownListOption("1", "Evet"),
+                        new DropdownListOption("0", "Hayır")
+                    };
+                }
+                else if (column.IsForeignKey && column.NavigationColumnInfoDTO != null)
+                {
+                    options = await Lookup.GetNavigationOptionsAsync(column.NavigationColumnInfoDTO, addEmptyOption: true);
+                }
+
+                if (options != null)
+                    _optionsByField[key] = options;
+            }
+        }
+    }
+
+    private static string FieldKey(MetaColumnDTO column) => $"{column.TableName}.{column.Name}";
+
+    private static bool IsBetweenFilter(MetaColumnDTO column)
+        => column.FilterDTO?.TypeName == nameof(BetweenFilter);
+
+    private List<DropdownListOption>? GetOptions(MetaColumnDTO column)
+        => _optionsByField.TryGetValue(FieldKey(column), out var options) ? options : null;
+
+    private string? GetRawValue(MetaColumnDTO column, int index)
+        => _rawValues.TryGetValue(FieldKey(column), out var values) ? values.ElementAtOrDefault(index) : null;
+
+    private void SetRawValue(MetaColumnDTO column, int index, object? value)
+    {
+        var key = FieldKey(column);
+
+        if (!_rawValues.ContainsKey(key))
+            _rawValues[key] = new string?[2];
+
+        _rawValues[key][index] = value?.ToString();
+    }
+
+    private string GetInputType(MetaColumnDTO column) => column.ValueType switch
+    {
+        ColumnValueType.DateTime => "date",
+        ColumnValueType.Int or ColumnValueType.Double or ColumnValueType.Float => "number",
+        _ => "text"
+    };
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await ApplyFilters();
+    }
+
+    private async Task ApplyFilters()
+    {
+        foreach (var column in FilterColumns)
+        {
+            if (column.FilterDTO == null)
+                continue;
+
+            var values = _rawValues.TryGetValue(FieldKey(column), out var raw) ? raw : new string?[2];
+
+            if (IsBetweenFilter(column))
+            {
+                if (!string.IsNullOrEmpty(values[0]) && !string.IsNullOrEmpty(values[1]))
+                    column.FilterDTO.SetParameters(new List<object?> { values[0], values[1] });
+                else
+                    column.FilterDTO.ClearParameters();
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(values[0]))
+                    column.FilterDTO.SetParameters(new List<object?> { values[0] });
+                else
+                    column.FilterDTO.ClearParameters();
+            }
+        }
+
+        Table.PageNumber = 1;
+
+        await TableChanged.InvokeAsync(Table);
+    }
+
+    private async Task ClearFilters()
+    {
+        _rawValues.Clear();
+
+        foreach (var column in FilterColumns)
+            column.FilterDTO?.ClearParameters();
+
+        Table.PageNumber = 1;
+
+        await TableChanged.InvokeAsync(Table);
+    }
+}

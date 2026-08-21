@@ -1,0 +1,385 @@
+@typeparam T where T : class, new()
+@using Hydra.DTOs
+@using Hydra.DataModels
+@using Hydra.RazorClassLibrary.Services.Core
+@using System.Globalization
+@using System.Reflection
+
+@* Create + Edit modlarını tek yerden yöneten meta-veri güdümlü form motoru.
+   Id verilirse Edit, verilmezse Create modunda çalışır.
+
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid).
+   Mod farkı da class ile taşınır: kök elemana hydra-form--create / hydra-form--edit eklenir ve
+   kaydet butonu hydra-btn--create (Create) veya hydra-btn--edit-save (Edit) alır. Böylece
+   "Create yeşil, Edit mavi" gibi renk kararlarını tema dosyası verir, bileşen değil. *@
+
+@if (IsLoading)
+{
+    <SpinnerComponent />
+}
+else if (Table == null)
+{
+    <div class="hydra-form__alert">Form metadatası yüklenemedi.</div>
+}
+else
+{
+    <div class="hydra-form @(IsEditMode ? "hydra-form--edit" : "hydra-form--create")">
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="hydra-form__banner" role="alert">
+                <i class="hydra-icon bi bi-exclamation-octagon hydra-form__banner-icon"></i>
+                <div>
+                    <h3 class="hydra-form__banner-title">İşlem tamamlanamadı</h3>
+                    <p class="hydra-form__banner-text">@ErrorMessage</p>
+                </div>
+            </div>
+        }
+
+        <div class="hydra-form__header">
+            <div>
+                <h1 class="hydra-form__title">@Title</h1>
+                @if (!string.IsNullOrEmpty(Subtitle))
+                {
+                    <p class="hydra-form__subtitle">@Subtitle</p>
+                }
+            </div>
+            <button type="button" class="hydra-btn hydra-btn--ghost hydra-form__back" @onclick="GoBack">
+                <i class="hydra-icon bi bi-arrow-left"></i>
+                <span>Geri</span>
+            </button>
+        </div>
+
+        <div class="hydra-form__body">
+            <div class="hydra-form__grid">
+                @foreach (var field in Fields)
+                {
+                    var prefilled = _prefilledFields.Contains(field.Name!);
+
+                    <div class="hydra-form__field @(IsWideField(field) ? "hydra-form__field--wide" : "")">
+                        <div class="hydra-form__label-row">
+                            <label class="hydra-form__label" for="@($"field-{field.Name}")">
+                                @if (prefilled)
+                                {
+                                    <i class="hydra-icon bi bi-lock-fill"></i>
+                                }
+                                @field.DisplayName
+                                @if (IsRequired(field))
+                                {
+                                    <span class="hydra-form__required">*</span>
+                                }
+                            </label>
+                            @if (prefilled)
+                            {
+                                <span class="hydra-form__badge">Önceden dolduruldu</span>
+                            }
+                        </div>
+
+                        <ColumnFieldComponent Column="@field"
+                                              Value="@GetModelValue(field)"
+                                              ValueChanged="@(v => SetModelValue(field, v))"
+                                              Options="@GetOptions(field)"
+                                              Disabled="@IsFieldDisabled(field)" />
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="hydra-form__footer">
+            <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="GoBack">Vazgeç</button>
+            <button type="button"
+                    class="hydra-btn @(IsEditMode ? "hydra-btn--edit-save" : "hydra-btn--create")"
+                    disabled="@IsSaving"
+                    @onclick="Save">
+                @if (IsSaving)
+                {
+                    <i class="hydra-icon hydra-btn__spinner"></i>
+                }
+                else
+                {
+                    <i class="hydra-icon bi @(IsEditMode ? "bi-check-circle-fill" : "bi-plus-lg")"></i>
+                }
+                <span>@(IsEditMode ? "Kaydet" : "Oluştur")</span>
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] public NavigationManager Navigation { get; set; } = default!;
+    [Inject] public LookupService Lookup { get; set; } = default!;
+
+    [Parameter, EditorRequired] public ApiClient<T> Client { get; set; } = default!;
+
+    /// <summary>Null ise Create, dolu ise Edit modu.</summary>
+    [Parameter] public Guid? Id { get; set; }
+
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Başlığın altında görünen isteğe bağlı açıklama satırı.</summary>
+    [Parameter] public string? Subtitle { get; set; }
+
+    [Parameter] public string? BasePath { get; set; }
+    [Parameter] public EventCallback<T> OnSaved { get; set; }
+
+    private bool IsEditMode => Id.HasValue;
+
+    private TableDTO? Table;
+    private T Model = new();
+    private List<MetaColumnDTO> Fields = new();
+    private readonly Dictionary<string, List<DropdownListOption>> _optionsByField = new();
+    private readonly Dictionary<string, object?> _rawValues = new();
+    private readonly HashSet<string> _prefilledFields = new();
+
+    private bool IsLoading = true;
+    private bool IsSaving;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        BasePath ??= Client.Controller;
+        Title ??= IsEditMode ? $"{Client.Controller} Düzenle" : $"Yeni {Client.Controller}";
+
+        try
+        {
+            if (IsEditMode)
+            {
+                Table = await Client.GetUpdateViewAsync(Id!.Value);
+                Model = await Client.GetByIdAsync(Id.Value) ?? new T();
+            }
+            else
+            {
+                Table = await Client.GetCreateViewAsync();
+                Model = new T();
+            }
+
+            BuildFields();
+
+            if (!IsEditMode)
+            {
+                ApplyDefaultValues();
+                ApplyQueryStringPrefills();
+            }
+
+            await ResolveOptionsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Form yüklenirken hata oluştu: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void BuildFields()
+    {
+        if (Table == null) return;
+
+        Fields = Table.MetaColumns
+            .Where(mc => mc.IsFilteredColumn && mc.CreateViewComponentFromThis)
+            .Where(mc => !string.Equals(mc.Name, "Id", StringComparison.OrdinalIgnoreCase))
+            .Where(mc => GetProperty(mc.Name) != null) //entity üzerinde karşılığı olmayan alanları (ör. IsHidden) atla
+            .GroupBy(mc => mc.Name)
+            .Select(g => g.First())
+            .OrderBy(mc => mc.FilterDTO?.Priority ?? 0)
+            .ToList();
+    }
+
+    private void ApplyDefaultValues()
+    {
+        foreach (var field in Fields.Where(f => f.DefaultValue != null))
+        {
+            SetModelValueCore(field, field.DefaultValue);
+        }
+    }
+
+    private void ApplyQueryStringPrefills()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        foreach (var field in Fields)
+        {
+            var value = query[field.Name!];
+
+            if (!string.IsNullOrEmpty(value))
+            {
+                SetModelValueCore(field, value);
+                _prefilledFields.Add(field.Name!);
+            }
+        }
+    }
+
+    private async Task ResolveOptionsAsync()
+    {
+        foreach (var field in Fields)
+        {
+            List<DropdownListOption>? options = null;
+
+            if (field.IsForeignKey && field.NavigationColumnInfoDTO != null)
+            {
+                options = await Lookup.GetNavigationOptionsAsync(field.NavigationColumnInfoDTO, addEmptyOption: true);
+            }
+            else if (field.ValueType == ColumnValueType.Enum)
+            {
+                options = Lookup.GetEnumOptions(field.PropertyTypeName);
+            }
+            else if (field.ValueType == ColumnValueType.Boolean &&
+                     (field.HtmlElementType == HtmlElementType.DropdownList || field.HtmlElementType == HtmlElementType.DataList))
+            {
+                options = Lookup.GetBooleanOptions();
+            }
+
+            if (options != null)
+                _optionsByField[field.Name!] = options;
+        }
+    }
+
+    private List<DropdownListOption>? GetOptions(MetaColumnDTO field)
+        => _optionsByField.TryGetValue(field.Name!, out var options) ? options : null;
+
+    private bool IsFieldDisabled(MetaColumnDTO field)
+        => field.IsDisabled || _prefilledFields.Contains(field.Name!);
+
+    private static bool IsWideField(MetaColumnDTO field)
+        => field.HtmlElementType is HtmlElementType.TextArea or HtmlElementType.RichTextEditor;
+
+    /// <summary>Zorunluluk metadata'da tutulmuyor; entity üzerindeki CLR tipinden çıkarılır.
+    /// Nullable olmayan değer tipleri (Guid, int, DateTime, enum) mutlaka bir değer almak zorundadır.
+    /// bool hariç tutulur — checkbox'ta yıldız göstermek anlamsız olur.</summary>
+    private bool IsRequired(MetaColumnDTO field)
+    {
+        var property = GetProperty(field.Name);
+
+        if (property == null)
+            return false;
+
+        var type = property.PropertyType;
+
+        return type.IsValueType
+               && Nullable.GetUnderlyingType(type) == null
+               && type != typeof(bool);
+    }
+
+    private PropertyInfo? GetProperty(string? name)
+        => string.IsNullOrEmpty(name) ? null : typeof(T).GetProperty(name);
+
+    private object? GetModelValue(MetaColumnDTO field)
+    {
+        var prop = GetProperty(field.Name);
+
+        var value = prop?.GetValue(Model);
+
+        if (value == null)
+            return null;
+
+        //Enum değerleri dropdown key'i (int) ile eşleşmeli
+        if (prop!.PropertyType.IsEnum || (Nullable.GetUnderlyingType(prop.PropertyType)?.IsEnum ?? false))
+            return Convert.ToInt32(value);
+
+        return value;
+    }
+
+    private void SetModelValue(MetaColumnDTO field, object? raw)
+    {
+        SetModelValueCore(field, raw);
+        StateHasChanged();
+    }
+
+    private void SetModelValueCore(MetaColumnDTO field, object? raw)
+    {
+        var prop = GetProperty(field.Name);
+
+        if (prop == null || !prop.CanWrite)
+            return;
+
+        var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+        var isNullable = !prop.PropertyType.IsValueType || Nullable.GetUnderlyingType(prop.PropertyType) != null;
+
+        var s = raw?.ToString();
+
+        object? converted = null;
+
+        try
+        {
+            if (raw is bool b && targetType == typeof(bool))
+            {
+                converted = b;
+            }
+            else if (string.IsNullOrEmpty(s))
+            {
+                converted = null;
+            }
+            else if (targetType == typeof(string))
+            {
+                converted = s;
+            }
+            else if (targetType == typeof(Guid))
+            {
+                converted = Guid.TryParse(s, out var g) ? g : null;
+            }
+            else if (targetType.IsEnum)
+            {
+                converted = int.TryParse(s, out var ei)
+                                ? Enum.ToObject(targetType, ei)
+                                : Enum.Parse(targetType, s, ignoreCase: true);
+            }
+            else if (targetType == typeof(bool))
+            {
+                converted = s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "1" || s == "on";
+            }
+            else if (targetType == typeof(DateTime))
+            {
+                converted = DateTime.Parse(s, CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                converted = Convert.ChangeType(s, targetType, CultureInfo.InvariantCulture);
+            }
+        }
+        catch
+        {
+            converted = null;
+        }
+
+        if (converted == null && !isNullable)
+            converted = Activator.CreateInstance(prop.PropertyType);
+
+        prop.SetValue(Model, converted);
+    }
+
+    private async Task Save()
+    {
+        IsSaving = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var result = IsEditMode
+                            ? await Client.UpdateAsync(Model)
+                            : await Client.CreateAsync(Model);
+
+            if (result != null)
+            {
+                await OnSaved.InvokeAsync(result);
+                Navigation.NavigateTo($"/{BasePath}");
+            }
+            else
+            {
+                ErrorMessage = "Kayıt işlemi başarısız oldu. Zorunlu alanları kontrol edin.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Kayıt sırasında hata oluştu: {ex.Message}";
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo($"/{BasePath}");
+}

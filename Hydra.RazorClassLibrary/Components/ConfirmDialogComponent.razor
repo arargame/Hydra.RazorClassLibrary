@@ -1,0 +1,70 @@
+@* Genel amaçlı onay penceresi: Title + Message + Vazgeç/Onayla.
+   Onaylanan işlem değişebildiği için renk varyantı da parametrik (Variant): "danger" (sil),
+   "primary" (kaydet/onayla) vb. Bileşen sadece hydra-modal--{Variant} class'ını basar; o
+   varyantın hangi renge karşılık geldiğine tema dosyası karar verir.
+
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+@if (IsOpen)
+{
+    <div class="hydra-modal-backdrop" @onclick="Cancel">
+        <div class="hydra-modal hydra-modal--@Variant" @onclick:stopPropagation="true">
+            <div class="hydra-modal__header">
+                <i class="hydra-icon bi @Icon hydra-modal__header-icon"></i>
+                <h2 class="hydra-modal__title">@Title</h2>
+                <button type="button" class="hydra-modal__close" title="Kapat" @onclick="Cancel">
+                    <i class="hydra-icon bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="hydra-modal__body">
+                <p class="hydra-modal__text">@Message</p>
+            </div>
+
+            <div class="hydra-modal__footer">
+                <button type="button" class="hydra-btn hydra-btn--secondary" @onclick="Cancel">@CancelText</button>
+                <button type="button" class="hydra-btn hydra-modal__confirm" @onclick="Confirm">@ConfirmText</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Onay";
+    [Parameter] public string Message { get; set; } = "Bu işlemi yapmak istediğinize emin misiniz?";
+    [Parameter] public string ConfirmText { get; set; } = "Evet";
+    [Parameter] public string CancelText { get; set; } = "Vazgeç";
+
+    /// <summary>Renk varyantı: "danger" (varsayılan), "primary", "success"... Temaya
+    /// hydra-modal--{Variant} class'ı olarak geçer.</summary>
+    [Parameter] public string Variant { get; set; } = "danger";
+
+    /// <summary>Başlıktaki Bootstrap Icons sınıfı.</summary>
+    [Parameter] public string Icon { get; set; } = "bi-exclamation-triangle-fill";
+
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    public void Open() { IsOpen = true; StateHasChanged(); }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task Confirm()
+    {
+        await Close();
+        await OnConfirm.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        await Close();
+        await OnCancel.InvokeAsync();
+    }
+}

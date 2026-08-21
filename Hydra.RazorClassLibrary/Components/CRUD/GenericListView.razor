@@ -3,39 +3,75 @@
 @using Hydra.DTOs
 @using Hydra.RazorClassLibrary.Components.Grids
 
+@* Meta-veri güdümlü liste ekranı: filtre barı + grid + sayfalama + CRUD aksiyonları.
+
+   TEMA NOTU: CSS framework'süz. Sadece anlamsal "hydra-*" class'ları basar; görünüm host
+   projenin stylesheet'inden gelir (bkz. HydraGrid'deki açıklama). Renk konvansiyonu class
+   isimleriyle taşınır — hydra-btn--create / --edit / --delete / --details — böylece her proje
+   kendi paletini uygulayabilir. *@
+
 @if (Table == null)
 {
-    <div>Loading...</div>
+    <SpinnerComponent />
 }
 else
 {
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h3>@Title</h3>
-             @if (ShowCreateButton)
-             {
-                 <button class="btn btn-primary" @onclick="GoToCreate">
-                     <i class="bi bi-plus-lg"></i> Yeni Kayıt
-                 </button>
-             }
+    <div class="hydra-listview">
+        <div class="hydra-listview__header">
+            <h2 class="hydra-listview__title">@Title</h2>
+            <div class="hydra-listview__actions">
+                @if (ShowFilterToggle)
+                {
+                    <button type="button" class="hydra-btn hydra-btn--secondary @(ShowFilters ? "hydra-btn--active" : "")"
+                            @onclick="() => ShowFilters = !ShowFilters">
+                        <i class="hydra-icon bi bi-funnel"></i>
+                        <span>Filtreler</span>
+                    </button>
+                }
+                @if (ShowCreateButton)
+                {
+                    <button type="button" class="hydra-btn hydra-btn--create" @onclick="GoToCreate">
+                        <i class="hydra-icon bi bi-plus-lg"></i>
+                        <span>Yeni Kayıt</span>
+                    </button>
+                }
+            </div>
         </div>
-        <div class="card-body">
-            <HydraGrid Table="@Table" TableChanged="OnTableChanged" HasActions="true">
+
+        @if (ShowFilters)
+        {
+            <FilterBarComponent Table="@Table" TableChanged="OnTableChanged" />
+        }
+
+        <div class="hydra-listview__body">
+            <HydraGrid Table="@Table" TableChanged="OnTableChanged" HasActions="true"
+                       ShowDetailsColumnIfBound="@ShowDetailsColumn" DetailsClicked="@(id => GoToDetails(id))">
                 <ChildContent Context="row">
-                     <!-- Default Actions -->
-                     <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => GoToDetails(row.Id)">
-                         <i class="bi bi-eye"></i>
-                     </button>
-                     <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => GoToUpdate(row.Id)">
-                         <i class="bi bi-pencil"></i>
-                     </button>
-                     <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDelete(row.Id)">
-                         <i class="bi bi-trash"></i>
-                     </button>
+                    @if (RowActions != null)
+                    {
+                        @RowActions(row)
+                    }
+                    else
+                    {
+                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--edit" title="Düzenle"
+                                @onclick="() => GoToUpdate(row.Id)">
+                            <i class="hydra-icon bi bi-pencil"></i>
+                        </button>
+                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--delete" title="Sil"
+                                @onclick="() => AskDelete(row.Id)">
+                            <i class="hydra-icon bi bi-trash"></i>
+                        </button>
+                    }
                 </ChildContent>
             </HydraGrid>
         </div>
     </div>
+
+    <ConfirmDialogComponent @bind-IsOpen="ShowDeleteConfirm"
+                            Title="Kaydı Sil"
+                            Message="Bu kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+                            ConfirmText="Sil"
+                            OnConfirm="ConfirmDelete" />
 }
 
 @code {
@@ -44,39 +80,38 @@ else
     [Parameter, EditorRequired] public ApiClient<T> Client { get; set; } = default!;
     [Parameter] public string? Title { get; set; }
     [Parameter] public bool ShowCreateButton { get; set; } = true;
-    
+    [Parameter] public bool ShowFilterToggle { get; set; } = true;
+    [Parameter] public bool ShowFiltersInitially { get; set; } = false;
+
+    /// <summary>Varsayılan Düzenle/Sil butonları yerine özel aksiyonlar (sağ taraf). Detay butonu ayrıca en solda, bağımsız gösterilir.</summary>
+    [Parameter] public RenderFragment<RowDTO>? RowActions { get; set; }
+
+    /// <summary>Satırın en solunda Id'ye göre Details view'a giden Detay butonu gösterilsin mi.</summary>
+    [Parameter] public bool ShowDetailsColumn { get; set; } = true;
+
     // Optional: Override default navigation paths
-    [Parameter] public string? BasePath { get; set; } 
+    [Parameter] public string? BasePath { get; set; }
 
     private TableDTO? Table { get; set; }
+    private bool ShowFilters;
+    private bool ShowDeleteConfirm;
+    private Guid PendingDeleteId;
 
     protected override async Task OnInitializedAsync()
     {
-        Console.WriteLine($"[GenericListView] OnInitializedAsync for {typeof(T).Name}");
-        if (string.IsNullOrEmpty(Title))
-        {
-            Title = typeof(T).Name + " Listesi";
-        }
-        
-        // Define BasePath if not provided, assuming standard routing /{Controller}
-        if (string.IsNullOrEmpty(BasePath))
-        {
-            BasePath = Client.Controller;
-        }
+        Title ??= $"{typeof(T).Name} Listesi";
+        BasePath ??= Client.Controller;
+        ShowFilters = ShowFiltersInitially;
 
         await LoadDataAsync();
-        Console.WriteLine($"[GenericListView] OnInitializedAsync Completed. Table is null? {Table == null}");
     }
 
     private async Task LoadDataAsync()
     {
-        // If Table is null, create a default request
-        // If Table exists (e.g. pagination happened), it carries the state
+        // Table null ise varsayılan istek; doluysa (sayfalama/filtre/sıralama) state'i taşır
         var request = Table ?? new TableDTO { Name = Client.Controller, ViewType = Hydra.DTOs.ViewDTOs.ViewType.ListView };
-        
-        Console.WriteLine($"[GenericListView] Calling Client.SelectAsync for {request.Name}...");
+
         Table = await Client.SelectAsync(request);
-        Console.WriteLine($"[GenericListView] Client.SelectAsync returned. Table Rows: {Table?.Rows?.Count ?? 0}");
     }
 
     private async Task OnTableChanged(TableDTO updatedTable)
@@ -85,28 +120,28 @@ else
         await LoadDataAsync();
     }
 
-    private void GoToCreate()
+    private void GoToCreate() => Navigation.NavigateTo($"/{BasePath}/Create");
+
+    private void GoToDetails(Guid id) => Navigation.NavigateTo($"/{BasePath}/Details/{id}");
+
+    private void GoToUpdate(Guid id) => Navigation.NavigateTo($"/{BasePath}/Update/{id}");
+
+    private void AskDelete(Guid id)
     {
-        Navigation.NavigateTo($"/{BasePath}/Create");
+        PendingDeleteId = id;
+        ShowDeleteConfirm = true;
     }
 
-    private void GoToDetails(Guid id)
+    private async Task ConfirmDelete()
     {
-        Navigation.NavigateTo($"/{BasePath}/Details/{id}");
-    }
+        if (PendingDeleteId == Guid.Empty)
+            return;
 
-    private void GoToUpdate(Guid id)
-    {
-        Navigation.NavigateTo($"/{BasePath}/Update/{id}");
-    }
+        var success = await Client.DeleteAsync(PendingDeleteId);
 
-    private async Task OnDelete(Guid id)
-    {
-        // TODO: Add Confirmation Dialog logic here
-        var success = await Client.DeleteAsync(id);
+        PendingDeleteId = Guid.Empty;
+
         if (success)
-        {
             await LoadDataAsync();
-        }
     }
 }

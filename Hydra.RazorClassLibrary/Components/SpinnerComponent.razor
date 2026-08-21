@@ -1,4 +1,7 @@
-﻿@inherits SpinnerComponentModel
+@inherits SpinnerComponentModel
+
+@* Yükleniyor göstergesi.
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ı basar (bkz. HydraGrid). *@
 
 @RenderElement()
 
@@ -8,8 +11,9 @@
     {
         if (!IsVisible) return;
 
-        <div class="spinner-border m-5" role="status">
-            <span class="visually-hidden">Loading...</span>
+        <div class="hydra-spinner" role="status">
+            <span class="hydra-spinner__ring"></span>
+            <span class="hydra-spinner__label">Yükleniyor...</span>
         </div>
         ;
     };

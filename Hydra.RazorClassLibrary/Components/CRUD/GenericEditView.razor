@@ -1,0 +1,15 @@
+@typeparam T where T : class, new()
+@using Hydra.RazorClassLibrary.Services.Core
+
+@* Düzenleme ekranı — GenericFormView'in Edit modu. *@
+
+<GenericFormView T="T" Client="@Client" Id="@Id" Title="@Title" Subtitle="@Subtitle" BasePath="@BasePath" OnSaved="@OnSaved" />
+
+@code {
+    [Parameter, EditorRequired] public ApiClient<T> Client { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid Id { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? BasePath { get; set; }
+    [Parameter] public EventCallback<T> OnSaved { get; set; }
+}

@@ -1,0 +1,154 @@
+@using Hydra.DTOs
+@using Hydra.DTOs.ViewDTOs
+@using Hydra.RazorClassLibrary.Services.Http
+@using Hydra.RazorClassLibrary.Components.Grids
+@inject NavigationManager Navigation
+
+@* Master-detail ekranlarında, üst kaydın alt kayıtlarını listeler.
+   Örn: RequestCategory detayında o kategoriye ait Request'ler.
+
+   Bir GenericDetailsView içinde kullanılıyorsa (IDetailsTabsHost cascade edilmişse) kendini
+   otomatik olarak bir sekme olarak kaydeder ve sadece aktif sekme iken görünür; kart çerçevesini
+   de bırakır, çünkü çerçeveyi sekme kartı sağlar. Tek başına kullanılırsa kendi kartıyla render olur.
+
+   Filtre normalde FK = ParentId (Guid) şeklindedir. Log gibi gerçek FK'sı olmayan, gevşek bağlı
+   tablolar için ForeignKeyValue (ör. Id'nin string hâli) ve ExtraFilters (ör. EntityType) kullanılır.
+
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+<div class="hydra-collection @(IsActiveTab ? "" : "hydra-collection--hidden") @(TabsHost == null ? "hydra-collection--standalone" : "")">
+
+    <div class="hydra-collection__header">
+        <h3 class="hydra-collection__title">
+            @if (TabsHost == null)
+            {
+                <i class="hydra-icon bi bi-collection"></i>
+            }
+            @Title
+        </h3>
+        @if (ShowCreateButton)
+        {
+            <a class="hydra-btn hydra-btn--add" href="@CreateLink">
+                <i class="hydra-icon bi bi-plus-lg"></i>
+                <span>Ekle</span>
+            </a>
+        }
+    </div>
+
+    <div class="hydra-collection__body">
+        @if (IsLoading)
+        {
+            <SpinnerComponent />
+        }
+        else
+        {
+            <HydraGrid Table="@Table" TableChanged="OnTableChanged" HasActions="false"
+                       ShowPageSizeSelector="false" ShowSearchBox="false"
+                       ShowDetailsColumnIfBound="@ShowDetailsColumn"
+                       DetailsClicked="@(id => Navigation.NavigateTo($"/{RoutePath}/Details/{id}"))" />
+        }
+    </div>
+</div>
+
+@code {
+    [Inject] public IHttpClientService Http { get; set; } = default!;
+
+    /// <summary>GenericDetailsView tarafından cascade edilir; bulunursa bu bölüm bir sekmeye dönüşür.</summary>
+    [CascadingParameter] private IDetailsTabsHost? TabsHost { get; set; }
+
+    private bool IsActiveTab => TabsHost == null || Equals(TabsHost.ActiveTabKey, this);
+
+    /// <summary>Alt kayıtların controller adı (ör. "Request").</summary>
+    [Parameter, EditorRequired] public string Controller { get; set; } = default!;
+
+    /// <summary>Alt tablodaki filtre kolonu (ör. "RequestCategoryId", Log için "EntityId").</summary>
+    [Parameter, EditorRequired] public string ForeignKeyName { get; set; } = default!;
+
+    /// <summary>Üst kaydın Id'si.</summary>
+    [Parameter, EditorRequired] public Guid ParentId { get; set; }
+
+    /// <summary>Filtreye ParentId yerine bunun konmasını sağlar (ör. Log.EntityId string olduğu için
+    /// Id.ToString()). Verilmezse ParentId kullanılır.</summary>
+    [Parameter] public object? ForeignKeyValue { get; set; }
+
+    /// <summary>Ana filtreye ek olarak uygulanacak sabit eşitlik filtreleri (ör. EntityType = "Position").</summary>
+    [Parameter] public Dictionary<string, object?>? ExtraFilters { get; set; }
+
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool ShowCreateButton { get; set; } = true;
+
+    /// <summary>Satırların solunda detaya giden buton gösterilsin mi (Log gibi kendi detay
+    /// ekranı olmayan tablolarda kapatılır).</summary>
+    [Parameter] public bool ShowDetailsColumn { get; set; } = true;
+
+    [Parameter] public int PageSize { get; set; } = 5;
+
+    /// <summary>Detay/Create rotalarının taban yolu; boşsa Controller kullanılır.</summary>
+    [Parameter] public string? BasePath { get; set; }
+
+    private TableDTO? Table;
+    private bool IsLoading = true;
+
+    private string RoutePath => string.IsNullOrEmpty(BasePath) ? Controller : BasePath;
+
+    private string CreateLink => $"/{RoutePath}/Create?{ForeignKeyName}={ParentId}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Title ??= Controller;
+
+        //Sekme olarak kaydol — host yoksa (TabsHost null) hiçbir şey yapmaz.
+        TabsHost?.RegisterTab(this, Title);
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+
+        var request = Table ?? new TableDTO(Controller)
+        {
+            ViewType = ViewType.ListView,
+            PageNumber = 1,
+            PageSize = PageSize
+        };
+
+        //Üst kayda göre filtrele
+        request.AlterOrAddMetaColumn(
+            MetaColumnDTO.CreateColumnDTOWithEqualFilter(name: ForeignKeyName,
+                                                         alias: null,
+                                                         value: ForeignKeyValue ?? ParentId,
+                                                         useFilterToCreateViewComponent: false));
+
+        //Gevşek bağlı tablolar için ek sabit filtreler (ör. Log.EntityType)
+        if (ExtraFilters != null)
+        {
+            foreach (var filter in ExtraFilters)
+            {
+                request.AlterOrAddMetaColumn(
+                    MetaColumnDTO.CreateColumnDTOWithEqualFilter(name: filter.Key,
+                                                                 alias: null,
+                                                                 value: filter.Value,
+                                                                 useFilterToCreateViewComponent: false));
+            }
+        }
+
+        Table = await Http.PostEnvelopeAsync<TableDTO>(
+            controller: Controller,
+            action: "Select",
+            payload: request,
+            parameters: new Dictionary<string, string> { ["viewType"] = ViewType.ListView.ToString() });
+
+        IsLoading = false;
+
+        if (Table != null)
+            TabsHost?.UpdateTabCount(this, Table.FilteredTotalRecordsCount);
+    }
+
+    private async Task OnTableChanged(TableDTO updated)
+    {
+        Table = updated;
+        await LoadAsync();
+    }
+}

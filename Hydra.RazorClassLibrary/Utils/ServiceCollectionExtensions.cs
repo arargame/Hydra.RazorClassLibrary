@@ -1,4 +1,5 @@
 using Hydra.RazorClassLibrary.Services.Authentication;
+using Hydra.RazorClassLibrary.Services.Core;
 using Hydra.RazorClassLibrary.Services.Http;
 using Hydra.RazorClassLibrary.Services.Logging;
 using Hydra.RazorClassLibrary.Services.Storage;
@@ -31,6 +32,12 @@ namespace Hydra.RazorClassLibrary.Utils
                 provider.GetRequiredService<HydraAuthenticationStateProvider>());
 
             services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+            // Generic API client: herhangi bir entity için ApiClient<T> inject edilebilir
+            services.AddScoped(typeof(ApiClient<>));
+
+            // FK / enum / boolean dropdown seçenekleri
+            services.AddScoped<LookupService>();
 
             return services;
         }

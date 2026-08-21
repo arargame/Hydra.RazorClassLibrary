@@ -1,0 +1,277 @@
+@typeparam T where T : class, new()
+@using Hydra.DTOs
+@using Hydra.RazorClassLibrary.Services.Core
+@implements IDetailsTabsHost
+
+@* Meta-veri güdümlü detay (DetailsView) ekranı.
+
+   Yapı: başlık kartı (aksiyonlar) → özet kartı (ana property'ler) → sekmeli koleksiyon kartı.
+   Sayfanın verdiği CollectionViewSection'lar kendilerini sekme olarak kaydeder (IDetailsTabsHost).
+   Bunlara ek olarak, EN SONA otomatik bir "Loglar" sekmesi eklenir: Log tablosunda bu kayda ait
+   satırlar (EntityType + EntityId) listelenir. BaseObject ile Log arasında FK yoktur — bağ
+   yalnızca EntityId üzerinden, select ile kurulur. ShowLogsTab ile kapatılabilir.
+
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+@if (IsLoading)
+{
+    <SpinnerComponent />
+}
+else if (Table == null || Row == null)
+{
+    <div class="hydra-details__empty">Kayıt bulunamadı.</div>
+}
+else
+{
+    <div class="hydra-details">
+
+        <header class="hydra-details__header">
+            <div class="hydra-details__heading">
+                <div class="hydra-details__eyebrow-row">
+                    <span class="hydra-details__eyebrow">@Title</span>
+                    <span class="hydra-details__dot"></span>
+                    @if (ActiveState != null)
+                    {
+                        <span class="hydra-details__state">@(ActiveState.Value ? "Aktif" : "Pasif")</span>
+                    }
+                </div>
+                <h1 class="hydra-details__title">@RecordTitle</h1>
+            </div>
+
+            <div class="hydra-details__actions">
+                <button type="button" class="hydra-btn hydra-btn--secondary" @onclick="GoBack">
+                    <i class="hydra-icon bi bi-arrow-left"></i>
+                    <span>Geri</span>
+                </button>
+                <button type="button" class="hydra-btn hydra-btn--edit" @onclick="GoToEdit">
+                    <i class="hydra-icon bi bi-pencil"></i>
+                    <span>Düzenle</span>
+                </button>
+                <button type="button" class="hydra-btn hydra-btn--delete" @onclick="() => ShowDeleteConfirm = true">
+                    <i class="hydra-icon bi bi-trash"></i>
+                    <span>Sil</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="hydra-details__summary">
+            <div class="hydra-details__summary-header">
+                <h2 class="hydra-details__summary-title">Genel Bilgiler</h2>
+            </div>
+            <div class="hydra-details__summary-body">
+                @foreach (var column in DisplayColumns)
+                {
+                    <div class="hydra-details__pair">
+                        <span class="hydra-details__pair-label">@column.DisplayName</span>
+                        <span class="hydra-details__pair-value">
+                            @if (IsNavigationLink(column))
+                            {
+                                <a class="hydra-details__link" href="@GetNavigationLink(column)">@GetValue(column)</a>
+                            }
+                            else
+                            {
+                                @GetValue(column)
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="hydra-details__tabs-card">
+            <CascadingValue Value="(IDetailsTabsHost)this" IsFixed="true">
+
+                @* Sekme şeridi. Sekmeler, alttaki panellerin OnInitialized'ında kaydolur;
+                   bu yüzden ilk render'da boş olabilir, kayıt sonrası StateHasChanged ile dolar. *@
+                @if (_tabs.Count > 0)
+                {
+                    <div class="hydra-details__tabstrip" role="tablist">
+                        @foreach (var tab in _tabs)
+                        {
+                            var isActive = Equals(_activeTabKey, tab.Key);
+
+                            <button type="button" role="tab"
+                                    class="hydra-details__tab @(isActive ? "hydra-details__tab--active" : "")"
+                                    @onclick="() => SetActiveTab(tab.Key)">
+                                <span>@tab.Title</span>
+                                @if (tab.Count >= 0)
+                                {
+                                    <span class="hydra-details__tab-count">(@tab.Count)</span>
+                                }
+                                @if (isActive)
+                                {
+                                    <span class="hydra-details__dot"></span>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+
+                <div class="hydra-details__tabpanels">
+                    @ChildContent
+
+                    @if (ShowLogsTab)
+                    {
+                        @* Log'a FK yok: filtre EntityId (string) + EntityType üzerinden kurulur. *@
+                        <CollectionViewSection Title="Loglar"
+                                               Controller="Log"
+                                               ForeignKeyName="EntityId"
+                                               ParentId="@Id"
+                                               ForeignKeyValue="@Id.ToString()"
+                                               ExtraFilters="@LogFilters"
+                                               ShowCreateButton="false"
+                                               ShowDetailsColumn="false"
+                                               PageSize="10" />
+                    }
+                </div>
+            </CascadingValue>
+        </section>
+    </div>
+
+    <ConfirmDialogComponent @bind-IsOpen="ShowDeleteConfirm"
+                            Title="Kaydı Sil"
+                            Message="Bu kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+                            ConfirmText="Sil"
+                            Variant="danger"
+                            OnConfirm="DeleteAsync" />
+}
+
+@code {
+    [Inject] public NavigationManager Navigation { get; set; } = default!;
+
+    [Parameter, EditorRequired] public ApiClient<T> Client { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid Id { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? BasePath { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Her nesnenin detayında, en sonda otomatik "Loglar" sekmesi gösterilsin mi.</summary>
+    [Parameter] public bool ShowLogsTab { get; set; } = true;
+
+    /// <summary>Log satırlarını bu kaydın tipine göre daraltır (EntityId tek başına da benzersizdir,
+    /// EntityType filtresi indeksten faydalanmak ve doğruluğu garantilemek için eklenir).</summary>
+    private Dictionary<string, object?> LogFilters => new() { ["EntityType"] = typeof(T).Name };
+
+    private TableDTO? Table;
+    private RowDTO? Row;
+    private bool IsLoading = true;
+    private bool ShowDeleteConfirm;
+
+    private readonly List<TabEntry> _tabs = new();
+    private object? _activeTabKey;
+
+    private record TabEntry(object Key, string Title, int Count);
+
+    /// <summary>Başlıkta kaydın kendi adı gösterilir; yoksa ekran başlığına düşer.</summary>
+    private string? RecordTitle
+    {
+        get
+        {
+            var name = Row?.GetValueByColumnName("Name")?.ToString();
+
+            return string.IsNullOrWhiteSpace(name) ? Title : name;
+        }
+    }
+
+    /// <summary>BaseObject'ten gelen IsActive alanı varsa durum rozeti gösterilir, yoksa hiç gösterilmez.</summary>
+    private bool? ActiveState
+    {
+        get
+        {
+            var raw = Row?.GetValueByColumnName("IsActive")?.ToString();
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            if (bool.TryParse(raw, out var parsed))
+                return parsed;
+
+            return raw == "1" ? true : raw == "0" ? false : null;
+        }
+    }
+
+    // ---- IDetailsTabsHost ----
+
+    object? IDetailsTabsHost.ActiveTabKey => _activeTabKey;
+
+    void IDetailsTabsHost.RegisterTab(object key, string title)
+    {
+        if (_tabs.Any(t => Equals(t.Key, key)))
+            return;
+
+        _tabs.Add(new TabEntry(key, title, -1));
+        _activeTabKey ??= key;
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    void IDetailsTabsHost.UpdateTabCount(object key, int count)
+    {
+        var index = _tabs.FindIndex(t => Equals(t.Key, key));
+
+        if (index < 0)
+            return;
+
+        _tabs[index] = _tabs[index] with { Count = count };
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void SetActiveTab(object key) => _activeTabKey = key;
+
+    // ---- Veri ----
+
+    private List<MetaColumnDTO> DisplayColumns => Table == null
+        ? new List<MetaColumnDTO>()
+        : Table.GetSelectedMetaColumnsWithIncludes
+               .Where(c => !c.IsJoinedTableKey) //gizli join Id kolonlarını gösterme
+               .OrderBy(c => c.Priority)
+               .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        BasePath ??= Client.Controller;
+        Title ??= $"{Client.Controller} Detayı";
+
+        try
+        {
+            Table = await Client.GetDetailsViewAsync(Id);
+            Row = Table?.Rows?.FirstOrDefault();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private object? GetValue(MetaColumnDTO column)
+        => Row?.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name);
+
+    private bool IsNavigationLink(MetaColumnDTO column)
+        => column.NavigationColumnInfoDTO?.SetAsLink == true && GetNavigationLink(column) != null;
+
+    private string? GetNavigationLink(MetaColumnDTO column)
+    {
+        var navigation = column.NavigationColumnInfoDTO;
+
+        if (navigation == null)
+            return null;
+
+        //Flatten kolon öneki alias'tan gelir (ör. CreatedByEmployee_Id), rota ise gerçek tablodan (Employee).
+        var rightId = Row?.GetValueByColumnName($"{navigation.EffectiveRightTableAlias}_Id");
+
+        return rightId == null ? null : $"/{navigation.RightTableName}/Details/{rightId}";
+    }
+
+    private void GoBack() => Navigation.NavigateTo($"/{BasePath}");
+
+    private void GoToEdit() => Navigation.NavigateTo($"/{BasePath}/Update/{Id}");
+
+    private async Task DeleteAsync()
+    {
+        var success = await Client.DeleteAsync(Id);
+
+        if (success)
+            Navigation.NavigateTo($"/{BasePath}");
+    }
+}

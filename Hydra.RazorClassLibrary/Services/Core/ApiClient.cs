@@ -47,10 +47,26 @@ namespace Hydra.RazorClassLibrary.Services.Core
                  tableDTO.Name = Controller;
             }
 
+            //viewType is passed explicitly as query parameter; otherwise the server
+            //default ([FromQuery]ViewType? viewType = ViewType.ListView) would override
+            //the ViewType carried inside the TableDTO (CreateView/EditView/LookupView...).
             return await Http.PostEnvelopeAsync<Hydra.DTOs.TableDTO>(
-                controller: Controller, 
-                action: "Select", 
-                payload: tableDTO
+                controller: Controller,
+                action: "Select",
+                payload: tableDTO,
+                parameters: new Dictionary<string, string>
+                {
+                    ["viewType"] = tableDTO.ViewType.ToString()
+                }
+            );
+        }
+
+        public async Task<T?> GetByIdAsync(Guid id)
+        {
+            return await Http.GetEnvelopeAsync<T>(
+                controller: Controller,
+                action: "Get",
+                pathLikeParameter: id.ToString()
             );
         }
 

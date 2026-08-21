@@ -1,0 +1,160 @@
+@using Hydra.DTOs
+@using Hydra.RazorClassLibrary.ComponentModels
+@using Hydra.RazorClassLibrary.Services.Core
+@inject LookupService Lookup
+
+@* Genel amaçlı "kayıt seç" (lookup) modalı. FK alanları için basit &lt;select&gt; dropdown'a
+   alternatif; uzun listelerde arama kutusuyla seçim yapılmasını sağlar.
+
+   İki kullanım şekli:
+   1) Navigation parametresi verilirse, seçenekleri LookupService üzerinden kendisi yükler
+      (ColumnFieldComponent'teki FK dropdown ile aynı mekanizma — NavigationColumnInfoDTO).
+   2) Options parametresi doğrudan verilirse (örn. entity'e özel bir liste), onu kullanır.
+
+   Akış: satıra tıklamak seçer (işaretler), alttaki "Seçimi Onayla" butonu kapatıp sonucu döner.
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+@if (IsOpen)
+{
+    <div class="hydra-modal-backdrop" @onclick="Cancel">
+        <div class="hydra-modal hydra-modal--primary hydra-lookup" @onclick:stopPropagation="true">
+
+            <div class="hydra-modal__header">
+                <h2 class="hydra-modal__title">@Title</h2>
+                <button type="button" class="hydra-modal__close" title="Kapat" @onclick="Cancel">
+                    <i class="hydra-icon bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="hydra-lookup__search-bar">
+                <div class="hydra-lookup__search">
+                    <i class="hydra-icon bi bi-search hydra-lookup__search-icon"></i>
+                    <input class="hydra-input hydra-lookup__search-input" type="search" placeholder="@SearchPlaceholder"
+                           value="@_searchText" @oninput="e => _searchText = e.Value?.ToString() ?? string.Empty" />
+                </div>
+            </div>
+
+            <div class="hydra-lookup__list-wrap">
+                @if (IsLoading)
+                {
+                    <SpinnerComponent />
+                }
+                else if (FilteredOptions.Count == 0)
+                {
+                    <div class="hydra-lookup__empty">Eşleşen kayıt bulunamadı.</div>
+                }
+                else
+                {
+                    <ul class="hydra-lookup__list">
+                        @foreach (var option in FilteredOptions)
+                        {
+                            var isSelected = option.Key == SelectedKey;
+
+                            <li class="hydra-lookup__item @(isSelected ? "hydra-lookup__item--selected" : "")"
+                                @onclick="() => SelectedKey = option.Key">
+                                <span class="hydra-lookup__item-label">@option.Value</span>
+                                @if (isSelected)
+                                {
+                                    <i class="hydra-icon bi bi-check-circle-fill hydra-lookup__item-check"></i>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+
+            <div class="hydra-modal__footer">
+                <button type="button" class="hydra-btn hydra-btn--secondary" @onclick="Cancel">Vazgeç</button>
+                <button type="button" class="hydra-btn hydra-modal__confirm"
+                        disabled="@(string.IsNullOrEmpty(SelectedKey))"
+                        @onclick="ConfirmSelection">
+                    Seçimi Onayla
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Kayıt Seç";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Ara...";
+
+    /// <summary>Doğrudan verilen seçenek listesi (verilirse LookupService kullanılmaz).</summary>
+    [Parameter] public List<DropdownListOption>? Options { get; set; }
+
+    /// <summary>Options verilmezse, bu FK bilgisiyle LookupService.GetNavigationOptionsAsync çağrılır.</summary>
+    [Parameter] public NavigationColumnInfoDTO? Navigation { get; set; }
+
+    /// <summary>Şu an seçili olan değerin key'i (listede vurgulanır).</summary>
+    [Parameter] public string? SelectedKey { get; set; }
+
+    [Parameter] public EventCallback<DropdownListOption> OnSelected { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _searchText = string.Empty;
+    private bool IsLoading;
+    private List<DropdownListOption> _loadedOptions = new();
+    private bool _loadedOnce;
+
+    private List<DropdownListOption> FilteredOptions
+    {
+        get
+        {
+            var source = Options ?? _loadedOptions;
+
+            if (string.IsNullOrWhiteSpace(_searchText))
+                return source;
+
+            var term = _searchText.Trim();
+
+            return source
+                .Where(o => o.Value?.Contains(term, StringComparison.OrdinalIgnoreCase) == true)
+                .ToList();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        //Modal açıldığında ve Options doğrudan verilmediyse, seçenekleri (bir kere) yükle.
+        if (IsOpen && Options == null && Navigation != null && !_loadedOnce)
+        {
+            IsLoading = true;
+            _loadedOnce = true;
+
+            try
+            {
+                _loadedOptions = await Lookup.GetNavigationOptionsAsync(Navigation, addEmptyOption: false);
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+    }
+
+    private async Task ConfirmSelection()
+    {
+        var selected = (Options ?? _loadedOptions).FirstOrDefault(o => o.Key == SelectedKey);
+
+        if (selected == null)
+            return;
+
+        await Close();
+        await OnSelected.InvokeAsync(selected);
+    }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task Cancel()
+    {
+        await Close();
+        await OnCancel.InvokeAsync();
+    }
+}

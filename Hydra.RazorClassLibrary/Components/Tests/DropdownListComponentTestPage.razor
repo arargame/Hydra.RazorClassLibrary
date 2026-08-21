@@ -1,17 +1,25 @@
-﻿@page "/dropdownlist-component-test"
+@page "/dropdownlist-component-test"
 @using Hydra.RazorClassLibrary.Components
 @using Hydra.RazorClassLibrary.Utils
 
 <TestElementDisplay HeaderTitle="DropdownList Test" Debugger="@Debugger">
     <DropdownListComponent Debugger="@Debugger"
-                       IsTested="true"
-                       WithSelectPlaceholder="true"
+                           IsTested="true"
+                           WithSelectPlaceholder="true"
+                           Options="@TestOptions"
                            OnSelectedOptionChanged="HandleSelectedOptionChanged" />
 </TestElementDisplay>
 
 
 @code {
     private ComponentDebugger Debugger = new();
+
+    private List<DropdownListOption> TestOptions = new()
+    {
+        new DropdownListOption(key: "1", value: "Option1"),
+        new DropdownListOption(key: "2", value: "Option2"),
+        new DropdownListOption(key: "3", value: "Option3")
+    };
 
     private void HandleSelectedOptionChanged(DropdownListOption option)
     {

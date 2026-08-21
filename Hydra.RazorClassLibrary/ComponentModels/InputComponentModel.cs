@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using Hydra.DataModels;
+using Microsoft.AspNetCore.Components;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,31 +8,8 @@ using System.Threading.Tasks;
 
 namespace Hydra.RazorClassLibrary.ComponentModels
 {
-    public enum HtmlInputType
-    {
-        button,
-        checkbox,
-        color,
-        date,
-        datetime_local,
-        email,
-        file,
-        hidden,
-        image,
-        month,
-        number,
-        password,
-        radio,
-        range,
-        reset,
-        search,
-        submit,
-        tel,
-        text,
-        time,
-        url,
-        week,
-    }
+    //NOT: HtmlInputType artık tek kaynaktan gelir: Hydra.DataModels.HtmlInputType.
+    //RCL içindeki kopya enum kaldırıldı (backend MetaColumn metasıyla birebir aynı tip kullanılıyor).
 
     public interface IInputComponentModel<T> : IHtmlElementComponentWithValue<T>
     {

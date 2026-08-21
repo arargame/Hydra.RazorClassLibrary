@@ -294,36 +294,57 @@ namespace Hydra.RazorClassLibrary.ComponentModels
             object? rawValue = e.Value;
             T? parsedValue = default;
 
+            //Nullable tipleri de destekle (DateTime?, int?, Guid? ...)
+            var targetType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+
+            var rawString = rawValue?.ToString();
+
             try
             {
-                if (typeof(T) == typeof(bool))
+                if (rawValue is T alreadyTyped)
                 {
-                    bool boolVal = rawValue switch
-                    {
-                        bool b => b,
-                        string s => s.Equals("true", StringComparison.OrdinalIgnoreCase),
-                        _ => false
-                    };
-                    parsedValue = (T)(object)boolVal;
+                    parsedValue = alreadyTyped;
                 }
-                else if (typeof(T) == typeof(int))
+                else if (string.IsNullOrEmpty(rawString))
                 {
-                    if (int.TryParse(rawValue?.ToString(), out int intVal))
-                        parsedValue = (T)(object)intVal;
+                    parsedValue = default;
                 }
-                else if (typeof(T) == typeof(double))
+                else if (targetType == typeof(bool))
                 {
-                    if (double.TryParse(rawValue?.ToString(), out double dblVal))
-                        parsedValue = (T)(object)dblVal;
+                    parsedValue = (T)(object)rawString.Equals("true", StringComparison.OrdinalIgnoreCase);
                 }
-                else if (typeof(T) == typeof(string))
+                else if (targetType == typeof(int) && int.TryParse(rawString, out var intVal))
                 {
-                    parsedValue = (T)(object?)rawValue?.ToString()!;
+                    parsedValue = (T)(object)intVal;
+                }
+                else if (targetType == typeof(double) && double.TryParse(rawString, out var dblVal))
+                {
+                    parsedValue = (T)(object)dblVal;
+                }
+                else if (targetType == typeof(decimal) && decimal.TryParse(rawString, out var decVal))
+                {
+                    parsedValue = (T)(object)decVal;
+                }
+                else if (targetType == typeof(DateTime) && DateTime.TryParse(rawString, out var dateVal))
+                {
+                    parsedValue = (T)(object)dateVal;
+                }
+                else if (targetType == typeof(Guid) && Guid.TryParse(rawString, out var guidVal))
+                {
+                    parsedValue = (T)(object)guidVal;
+                }
+                else if (targetType.IsEnum && Enum.TryParse(targetType, rawString, ignoreCase: true, out var enumVal))
+                {
+                    parsedValue = (T)enumVal;
+                }
+                else if (targetType == typeof(string))
+                {
+                    parsedValue = (T)(object)rawString;
                 }
                 else
                 {
                     // Fallback: direkt cast etmeyi dene
-                    parsedValue = (T?)Convert.ChangeType(rawValue, typeof(T));
+                    parsedValue = (T?)Convert.ChangeType(rawValue, targetType);
                 }
             }
             catch
@@ -337,9 +358,10 @@ namespace Hydra.RazorClassLibrary.ComponentModels
 
         protected override void OnParametersSet()
         {
-            if (WithLabel)
+            //Label istenmiş ama değeri verilmemişse Name'e düş
+            if (WithLabel && string.IsNullOrEmpty(LabelValue))
             {
-                LabelValue = "Comments";
+                LabelValue = Name;
             }
 
             base.OnParametersSet();

@@ -5,7 +5,7 @@
     <div class="hydra-pagination__info">
         @if (TotalRecordsCount > 0)
         {
-            <span>Toplam <strong>@TotalRecordsCount</strong> kayıt@(FilteredTotalRecordsCount != TotalRecordsCount ? $", filtrelenen: {FilteredTotalRecordsCount}" : "")</span>
+            <span><strong>@TotalRecordsCount</strong> records@(FilteredTotalRecordsCount != TotalRecordsCount ? $", {FilteredTotalRecordsCount} after filtering" : "")</span>
         }
     </div>
 
@@ -57,7 +57,7 @@
     @if (ShowPageSizeSelector)
     {
         <div class="hydra-pagination__size">
-            <span class="hydra-pagination__size-label">Sayfa boyutu</span>
+            <span class="hydra-pagination__size-label">Rows per page</span>
             <select class="hydra-select hydra-pagination__size-select" value="@PageSize" @onchange="OnPageSizeChanged">
                 @foreach (var size in PageSizeOptions)
                 {

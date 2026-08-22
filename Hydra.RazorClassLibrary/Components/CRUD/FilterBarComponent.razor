@@ -53,11 +53,11 @@
         <div class="hydra-filterbar__actions">
             <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="ClearFilters">
                 <i class="hydra-icon bi bi-x-lg"></i>
-                <span>Temizle</span>
+                <span>Clear</span>
             </button>
             <button type="button" class="hydra-btn hydra-btn--primary" @onclick="ApplyFilters">
                 <i class="hydra-icon bi bi-funnel"></i>
-                <span>Filtrele</span>
+                <span>Apply</span>
             </button>
         </div>
     </div>
@@ -107,9 +107,9 @@
                 {
                     options = new List<DropdownListOption>
                     {
-                        new DropdownListOption(string.Empty, "— Tümü —"),
-                        new DropdownListOption("1", "Evet"),
-                        new DropdownListOption("0", "Hayır")
+                        new DropdownListOption(string.Empty, "— All —"),
+                        new DropdownListOption("1", "Yes"),
+                        new DropdownListOption("0", "No")
                     };
                 }
                 else if (column.IsForeignKey && column.NavigationColumnInfoDTO != null)

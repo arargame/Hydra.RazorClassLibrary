@@ -30,7 +30,7 @@
         {
             <a class="hydra-btn hydra-btn--add" href="@CreateLink">
                 <i class="hydra-icon bi bi-plus-lg"></i>
-                <span>Ekle</span>
+                <span>Add</span>
             </a>
         }
     </div>
@@ -39,6 +39,18 @@
         @if (IsLoading)
         {
             <SpinnerComponent />
+        }
+        else if (LoadError != null)
+        {
+            @* Bir sekmenin sorgusu patlarsa sadece o sekme hata gösterir; detay ekranının
+               geri kalanı (ve diğer sekmeler) ayakta kalır. *@
+            <div class="hydra-collection__error">
+                <i class="hydra-icon bi bi-exclamation-triangle"></i>
+                <div>
+                    <strong>This list could not be loaded.</strong>
+                    <div class="hydra-collection__error-detail">@LoadError</div>
+                </div>
+            </div>
         }
         else
         {
@@ -83,11 +95,17 @@
 
     [Parameter] public int PageSize { get; set; } = 5;
 
+    /// <summary>Kolonlar CollectionView yerine ListView konfigürasyonundan alınsın mı.
+    /// İlgili ViewDTO'da CollectionView konfigürasyonu tanımlı değilse (tablo boş gelirse)
+    /// geçici kaçış yolu olarak kullanılır.</summary>
+    [Parameter] public bool UseListViewColumns { get; set; }
+
     /// <summary>Detay/Create rotalarının taban yolu; boşsa Controller kullanılır.</summary>
     [Parameter] public string? BasePath { get; set; }
 
     private TableDTO? Table;
     private bool IsLoading = true;
+    private string? LoadError;
 
     private string RoutePath => string.IsNullOrEmpty(BasePath) ? Controller : BasePath;
 
@@ -107,9 +125,16 @@
     {
         IsLoading = true;
 
+        //CollectionView olarak iste: bir entity'nin master-detail sekmesinde gösterilecek kolon
+        //seti, kendi tam ListView'ından farklı (ve daha dar) olabilsin diye ViewDTO'da ayrı
+        //konfigüre edilir (ListViewConfiguration.AlsoUseToCreateCollectionViewConfiguration).
+        //Bu view tipi için hiç konfigürasyon tanımlanmamışsa sunucu kolon üretemez — o durumda
+        //UseListViewColumns="true" ile ListView kolonlarına düşülebilir.
+        var effectiveViewType = UseListViewColumns ? ViewType.ListView : ViewType.CollectionView;
+
         var request = Table ?? new TableDTO(Controller)
         {
-            ViewType = ViewType.ListView,
+            ViewType = effectiveViewType,
             PageNumber = 1,
             PageSize = PageSize
         };
@@ -134,16 +159,31 @@
             }
         }
 
-        Table = await Http.PostEnvelopeAsync<TableDTO>(
-            controller: Controller,
-            action: "Select",
-            payload: request,
-            parameters: new Dictionary<string, string> { ["viewType"] = ViewType.ListView.ToString() });
+        try
+        {
+            LoadError = null;
 
-        IsLoading = false;
+            Table = await Http.PostEnvelopeAsync<TableDTO>(
+                controller: Controller,
+                action: "Select",
+                payload: request,
+                parameters: new Dictionary<string, string> { ["viewType"] = effectiveViewType.ToString() });
 
-        if (Table != null)
-            TabsHost?.UpdateTabCount(this, Table.FilteredTotalRecordsCount);
+            if (Table != null)
+                TabsHost?.UpdateTabCount(this, Table.FilteredTotalRecordsCount);
+        }
+        catch (Exception ex)
+        {
+            //Tek bir koleksiyonun sorgusu (ör. şeması uyuşmayan bir tablo) bütün detay ekranını
+            //düşürmesin; hata bu sekmenin içinde gösterilir, diğer sekmeler çalışmaya devam eder.
+            LoadError = ex.Message;
+
+            Table = null;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task OnTableChanged(TableDTO updated)

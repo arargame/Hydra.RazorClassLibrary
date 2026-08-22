@@ -3,6 +3,9 @@ using Hydra.DTOs;
 using Hydra.DTOs.ViewDTOs;
 using Hydra.RazorClassLibrary.ComponentModels;
 using Hydra.RazorClassLibrary.Services.Http;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 
 namespace Hydra.RazorClassLibrary.Services.Core
 {
@@ -84,14 +87,7 @@ namespace Hydra.RazorClassLibrary.Services.Core
             if (_cache.TryGetValue($"enum/{enumTypeName}", out var cached))
                 return WithEmptyOption(cached, addEmptyOption);
 
-            var enumType = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => !a.IsDynamic)
-                .SelectMany(a =>
-                {
-                    try { return a.GetTypes(); }
-                    catch { return Type.EmptyTypes; }
-                })
-                .FirstOrDefault(t => t.IsEnum && t.Name == enumTypeName);
+            var enumType = ResolveEnumType(enumTypeName);
 
             if (enumType == null)
                 return new List<DropdownListOption>();
@@ -100,7 +96,7 @@ namespace Hydra.RazorClassLibrary.Services.Core
                 .Cast<object>()
                 .Select(v => new DropdownListOption(
                     key: Convert.ToInt32(v).ToString(),
-                    value: v.ToString()))
+                    value: GetEnumMemberLabel(enumType, v)))
                 .ToList();
 
             _cache[$"enum/{enumTypeName}"] = options;
@@ -112,11 +108,130 @@ namespace Hydra.RazorClassLibrary.Services.Core
         {
             var options = new List<DropdownListOption>
             {
-                new DropdownListOption("true", "Evet"),
-                new DropdownListOption("false", "Hayır")
+                new DropdownListOption("true", "Yes"),
+                new DropdownListOption("false", "No")
             };
 
             return WithEmptyOption(options, addEmptyOption);
+        }
+
+        /// <summary>
+        /// Bir grid/detay hücresinin ham değerini kullanıcıya gösterilecek metne çevirir.
+        ///
+        /// Bunun asıl sebebi enum'lar: veritabanından gelen değer ham hâliyle 0/1/2 (ya da bazı
+        /// yazıcılarda doğrudan "Error" gibi isim) olur. MetaColumnDTO zaten ValueType=Enum ve
+        /// PropertyTypeName (ör. "LogProcessType") bilgisini taşıdığı için, dönüşüm burada
+        /// merkezî olarak yapılabilir ve bütün grid'ler bundan faydalanır.
+        /// </summary>
+        public string? GetDisplayText(MetaColumnDTO column, object? rawValue)
+        {
+            var text = rawValue?.ToString();
+
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            return column.ValueType switch
+            {
+                ColumnValueType.Enum => GetEnumDisplayText(column.PropertyTypeName, text),
+                ColumnValueType.Boolean => GetBooleanDisplayText(text),
+                _ => text
+            };
+        }
+
+        /// <summary>
+        /// Enum'un ham değerini (int ya da isim) okunabilir isme çevirir.
+        /// Enum tipi yüklü assembly'lerde bulunamazsa ham değer aynen döner — veri asla kaybolmaz.
+        /// </summary>
+        public string? GetEnumDisplayText(string? enumTypeName, string? rawValue)
+        {
+            if (string.IsNullOrWhiteSpace(enumTypeName) || string.IsNullOrWhiteSpace(rawValue))
+                return rawValue;
+
+            var options = GetEnumOptions(enumTypeName); //cache'li
+
+            if (options.Count == 0)
+                return rawValue;
+
+            //1) int olarak saklanmış (Repository/EF yolu)
+            var match = options.FirstOrDefault(o => o.Key == rawValue);
+
+            //2) zaten etiketin kendisi
+            match ??= options.FirstOrDefault(o => string.Equals(o.Value, rawValue, StringComparison.OrdinalIgnoreCase));
+
+            //3) üye adı olarak saklanmış (ör. LogDbWriterService, Type'ı ToString() ile yazıyor).
+            //   Etiket [Display] ile değiştirilmişse üye adı seçenek listesinde yer almaz,
+            //   bu yüzden önce enum'a parse edip int karşılığından eşleştir.
+            if (match == null)
+            {
+                var enumType = ResolveEnumType(enumTypeName);
+
+                if (enumType != null && Enum.TryParse(enumType, rawValue, ignoreCase: true, out var parsed) && parsed != null)
+                {
+                    var key = Convert.ToInt32(parsed).ToString();
+
+                    match = options.FirstOrDefault(o => o.Key == key);
+                }
+            }
+
+            return match?.Value ?? rawValue;
+        }
+
+        public string? GetBooleanDisplayText(string? rawValue)
+        {
+            if (string.IsNullOrWhiteSpace(rawValue))
+                return rawValue;
+
+            if (bool.TryParse(rawValue, out var parsed))
+                return parsed ? "Yes" : "No";
+
+            return rawValue switch
+            {
+                "1" => "Yes",
+                "0" => "No",
+                _ => rawValue
+            };
+        }
+
+        /// <summary>
+        /// Bir enum üyesinin kullanıcıya gösterilecek etiketini döner.
+        ///
+        /// Öncelik sırası: [Display(Name = "...")] → [Description("...")] → üyenin kendi adı.
+        /// Böylece "InProgress" yerine "Devam Ediyor" yazmak için enum'un üzerine tek satır
+        /// attribute koymak yeterli olur; hem dropdown'lar hem grid'ler hem filtreler aynı
+        /// etiketi kullanır (bu metot GetEnumOptions üzerinden hepsini besler).
+        ///
+        /// Etiket, enum'un tanımlandığı assembly'de durur. Bu yüzden ortak Hydra çekirdeğindeki
+        /// enum'lara dile özgü etiket KOYULMAZ (üye adları nötr İngilizce kalır); etiketleme
+        /// uygulamanın kendi enum'larında yapılır.
+        /// </summary>
+        /// <summary>Enum tipini yüklü assembly'lerde isimle arar (ör. "LogProcessType").</summary>
+        private static Type? ResolveEnumType(string enumTypeName)
+            => AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a => !a.IsDynamic)
+                .SelectMany(a =>
+                {
+                    try { return a.GetTypes(); }
+                    catch { return Type.EmptyTypes; }
+                })
+                .FirstOrDefault(t => t.IsEnum && t.Name == enumTypeName);
+
+        private static string GetEnumMemberLabel(Type enumType, object value)
+        {
+            var name = value.ToString() ?? string.Empty;
+
+            var member = enumType.GetMember(name).FirstOrDefault();
+
+            if (member == null)
+                return name;
+
+            var display = member.GetCustomAttribute<DisplayAttribute>()?.Name;
+
+            if (!string.IsNullOrWhiteSpace(display))
+                return display;
+
+            var description = member.GetCustomAttribute<DescriptionAttribute>()?.Description;
+
+            return string.IsNullOrWhiteSpace(description) ? name : description;
         }
 
         public void ClearCache() => _cache.Clear();
@@ -126,7 +241,7 @@ namespace Hydra.RazorClassLibrary.Services.Core
             var list = options.Select(o => new DropdownListOption(o.Key, o.Value, o.IsSelected)).ToList();
 
             if (addEmptyOption)
-                list.Insert(0, new DropdownListOption(string.Empty, "— Seçiniz —"));
+                list.Insert(0, new DropdownListOption(string.Empty, "— Select —"));
 
             return list;
         }

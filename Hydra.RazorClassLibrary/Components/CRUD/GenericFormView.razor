@@ -19,7 +19,7 @@
 }
 else if (Table == null)
 {
-    <div class="hydra-form__alert">Form metadatası yüklenemedi.</div>
+    <div class="hydra-form__alert">Form metadata could not be loaded.</div>
 }
 else
 {
@@ -30,7 +30,7 @@ else
             <div class="hydra-form__banner" role="alert">
                 <i class="hydra-icon bi bi-exclamation-octagon hydra-form__banner-icon"></i>
                 <div>
-                    <h3 class="hydra-form__banner-title">İşlem tamamlanamadı</h3>
+                    <h3 class="hydra-form__banner-title">Something went wrong</h3>
                     <p class="hydra-form__banner-text">@ErrorMessage</p>
                 </div>
             </div>
@@ -46,7 +46,7 @@ else
             </div>
             <button type="button" class="hydra-btn hydra-btn--ghost hydra-form__back" @onclick="GoBack">
                 <i class="hydra-icon bi bi-arrow-left"></i>
-                <span>Geri</span>
+                <span>Back</span>
             </button>
         </div>
 
@@ -71,7 +71,7 @@ else
                             </label>
                             @if (prefilled)
                             {
-                                <span class="hydra-form__badge">Önceden dolduruldu</span>
+                                <span class="hydra-form__badge">Prefilled</span>
                             }
                         </div>
 
@@ -86,7 +86,7 @@ else
         </div>
 
         <div class="hydra-form__footer">
-            <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="GoBack">Vazgeç</button>
+            <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="GoBack">Cancel</button>
             <button type="button"
                     class="hydra-btn @(IsEditMode ? "hydra-btn--edit-save" : "hydra-btn--create")"
                     disabled="@IsSaving"
@@ -99,7 +99,7 @@ else
                 {
                     <i class="hydra-icon bi @(IsEditMode ? "bi-check-circle-fill" : "bi-plus-lg")"></i>
                 }
-                <span>@(IsEditMode ? "Kaydet" : "Oluştur")</span>
+                <span>@(IsEditMode ? "Save" : "Create")</span>
             </button>
         </div>
     </div>
@@ -138,7 +138,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         BasePath ??= Client.Controller;
-        Title ??= IsEditMode ? $"{Client.Controller} Düzenle" : $"Yeni {Client.Controller}";
+        Title ??= IsEditMode ? $"Edit {Client.Controller}" : $"New {Client.Controller}";
 
         try
         {
@@ -165,7 +165,7 @@ else
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Form yüklenirken hata oluştu: {ex.Message}";
+            ErrorMessage = $"Failed to load the form: {ex.Message}";
         }
         finally
         {
@@ -368,12 +368,12 @@ else
             }
             else
             {
-                ErrorMessage = "Kayıt işlemi başarısız oldu. Zorunlu alanları kontrol edin.";
+                ErrorMessage = "Save failed. Please check the required fields.";
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Kayıt sırasında hata oluştu: {ex.Message}";
+            ErrorMessage = $"Failed to save: {ex.Message}";
         }
         finally
         {

@@ -845,3 +845,22 @@
 }
 
 .hydra-btn--add:hover { background: var(--hydra-bg-hover); color: var(--hydra-primary); }
+
+/* Bir koleksiyon sekmesinin sorgusu başarısız olduğunda gösterilen hata kutusu */
+.hydra-collection__error {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    padding: 1rem;
+    font-size: var(--hydra-font-sm);
+    color: var(--hydra-delete);
+    background: color-mix(in srgb, var(--hydra-delete) 8%, transparent);
+    border: 1px solid var(--hydra-delete);
+    border-radius: var(--hydra-radius-sm);
+}
+
+.hydra-collection__error-detail {
+    margin-top: 0.25rem;
+    color: var(--hydra-text-muted);
+    word-break: break-word;
+}

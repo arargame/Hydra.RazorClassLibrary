@@ -1,6 +1,7 @@
 @typeparam T where T : class, new()
 @using Hydra.DTOs
 @using Hydra.RazorClassLibrary.Services.Core
+@inject LookupService Lookup
 @implements IDetailsTabsHost
 
 @* Meta-veri güdümlü detay (DetailsView) ekranı.
@@ -19,7 +20,7 @@
 }
 else if (Table == null || Row == null)
 {
-    <div class="hydra-details__empty">Kayıt bulunamadı.</div>
+    <div class="hydra-details__empty">Record not found.</div>
 }
 else
 {
@@ -32,7 +33,7 @@ else
                     <span class="hydra-details__dot"></span>
                     @if (ActiveState != null)
                     {
-                        <span class="hydra-details__state">@(ActiveState.Value ? "Aktif" : "Pasif")</span>
+                        <span class="hydra-details__state">@(ActiveState.Value ? "Active" : "Inactive")</span>
                     }
                 </div>
                 <h1 class="hydra-details__title">@RecordTitle</h1>
@@ -41,22 +42,22 @@ else
             <div class="hydra-details__actions">
                 <button type="button" class="hydra-btn hydra-btn--secondary" @onclick="GoBack">
                     <i class="hydra-icon bi bi-arrow-left"></i>
-                    <span>Geri</span>
+                    <span>Back</span>
                 </button>
                 <button type="button" class="hydra-btn hydra-btn--edit" @onclick="GoToEdit">
                     <i class="hydra-icon bi bi-pencil"></i>
-                    <span>Düzenle</span>
+                    <span>Edit</span>
                 </button>
                 <button type="button" class="hydra-btn hydra-btn--delete" @onclick="() => ShowDeleteConfirm = true">
                     <i class="hydra-icon bi bi-trash"></i>
-                    <span>Sil</span>
+                    <span>Delete</span>
                 </button>
             </div>
         </header>
 
         <section class="hydra-details__summary">
             <div class="hydra-details__summary-header">
-                <h2 class="hydra-details__summary-title">Genel Bilgiler</h2>
+                <h2 class="hydra-details__summary-title">Key Information</h2>
             </div>
             <div class="hydra-details__summary-body">
                 @foreach (var column in DisplayColumns)
@@ -113,7 +114,7 @@ else
                     @if (ShowLogsTab)
                     {
                         @* Log'a FK yok: filtre EntityId (string) + EntityType üzerinden kurulur. *@
-                        <CollectionViewSection Title="Loglar"
+                        <CollectionViewSection Title="Logs"
                                                Controller="Log"
                                                ForeignKeyName="EntityId"
                                                ParentId="@Id"
@@ -129,9 +130,9 @@ else
     </div>
 
     <ConfirmDialogComponent @bind-IsOpen="ShowDeleteConfirm"
-                            Title="Kaydı Sil"
-                            Message="Bu kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
-                            ConfirmText="Sil"
+                            Title="Delete Record"
+                            Message="Are you sure you want to delete this record? This action cannot be undone."
+                            ConfirmText="Delete"
                             Variant="danger"
                             OnConfirm="DeleteAsync" />
 }
@@ -231,7 +232,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         BasePath ??= Client.Controller;
-        Title ??= $"{Client.Controller} Detayı";
+        Title ??= $"{Client.Controller} Details";
 
         try
         {
@@ -244,8 +245,10 @@ else
         }
     }
 
-    private object? GetValue(MetaColumnDTO column)
-        => Row?.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name);
+    /// <summary>Ham değeri kolonun metadata'sına göre okunabilir metne çevirir
+    /// (enum 0/1/2 → isim, boolean → Evet/Hayır). Bkz. LookupService.GetDisplayText.</summary>
+    private string? GetValue(MetaColumnDTO column)
+        => Lookup.GetDisplayText(column, Row?.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name));
 
     private bool IsNavigationLink(MetaColumnDTO column)
         => column.NavigationColumnInfoDTO?.SetAsLink == true && GetNavigationLink(column) != null;

@@ -25,14 +25,14 @@ else
                     <button type="button" class="hydra-btn hydra-btn--secondary @(ShowFilters ? "hydra-btn--active" : "")"
                             @onclick="() => ShowFilters = !ShowFilters">
                         <i class="hydra-icon bi bi-funnel"></i>
-                        <span>Filtreler</span>
+                        <span>Filters</span>
                     </button>
                 }
                 @if (ShowCreateButton)
                 {
                     <button type="button" class="hydra-btn hydra-btn--create" @onclick="GoToCreate">
                         <i class="hydra-icon bi bi-plus-lg"></i>
-                        <span>Yeni Kayıt</span>
+                        <span>New Record</span>
                     </button>
                 }
             </div>
@@ -53,11 +53,11 @@ else
                     }
                     else
                     {
-                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--edit" title="Düzenle"
+                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--edit" title="Edit"
                                 @onclick="() => GoToUpdate(row.Id)">
                             <i class="hydra-icon bi bi-pencil"></i>
                         </button>
-                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--delete" title="Sil"
+                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--delete" title="Delete"
                                 @onclick="() => AskDelete(row.Id)">
                             <i class="hydra-icon bi bi-trash"></i>
                         </button>
@@ -68,9 +68,9 @@ else
     </div>
 
     <ConfirmDialogComponent @bind-IsOpen="ShowDeleteConfirm"
-                            Title="Kaydı Sil"
-                            Message="Bu kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
-                            ConfirmText="Sil"
+                            Title="Delete Record"
+                            Message="Are you sure you want to delete this record? This action cannot be undone."
+                            ConfirmText="Delete"
                             OnConfirm="ConfirmDelete" />
 }
 
@@ -99,7 +99,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        Title ??= $"{typeof(T).Name} Listesi";
+        Title ??= $"{typeof(T).Name} List";
         BasePath ??= Client.Controller;
         ShowFilters = ShowFiltersInitially;
 

@@ -12,7 +12,7 @@
             <div class="hydra-modal__header">
                 <i class="hydra-icon bi @Icon hydra-modal__header-icon"></i>
                 <h2 class="hydra-modal__title">@Title</h2>
-                <button type="button" class="hydra-modal__close" title="Kapat" @onclick="Cancel">
+                <button type="button" class="hydra-modal__close" title="Close" @onclick="Cancel">
                     <i class="hydra-icon bi bi-x-lg"></i>
                 </button>
             </div>
@@ -33,10 +33,10 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
 
-    [Parameter] public string Title { get; set; } = "Onay";
-    [Parameter] public string Message { get; set; } = "Bu işlemi yapmak istediğinize emin misiniz?";
-    [Parameter] public string ConfirmText { get; set; } = "Evet";
-    [Parameter] public string CancelText { get; set; } = "Vazgeç";
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public string Message { get; set; } = "Are you sure you want to continue?";
+    [Parameter] public string ConfirmText { get; set; } = "Yes";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
 
     /// <summary>Renk varyantı: "danger" (varsayılan), "primary", "success"... Temaya
     /// hydra-modal--{Variant} class'ı olarak geçer.</summary>

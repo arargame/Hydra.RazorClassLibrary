@@ -1,4 +1,6 @@
 @using Hydra.DTOs
+@using Hydra.RazorClassLibrary.Services.Core
+@inject LookupService Lookup
 
 @* TableDTO'dan başlık + satır + sıralama + sayfalama üreten meta-veri güdümlü grid.
 
@@ -17,7 +19,7 @@ else if (Table.Rows == null || Table.Rows.Count == 0)
 {
     <div class="hydra-grid__empty">
         <i class="hydra-icon bi bi-info-circle"></i>
-        <span>Kayıt bulunamadı.</span>
+        <span>No records found.</span>
     </div>
 }
 else
@@ -47,7 +49,7 @@ else
         {
             <div class="hydra-grid__empty hydra-grid__empty--search">
                 <i class="hydra-icon bi bi-search"></i>
-                <span>Aramanızla eşleşen kayıt bulunamadı.</span>
+                <span>No records match your search.</span>
             </div>
         }
         else
@@ -75,7 +77,7 @@ else
                             }
                             @if (HasActions)
                             {
-                                <th class="hydra-grid__th hydra-grid__th--actions">İşlemler</th>
+                                <th class="hydra-grid__th hydra-grid__th--actions">Actions</th>
                             }
                         </tr>
                     </thead>
@@ -86,7 +88,7 @@ else
                                 @if (ShowDetailsColumn)
                                 {
                                     <td class="hydra-grid__cell hydra-grid__cell--details">
-                                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--details" title="Detay"
+                                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--details" title="Details"
                                                 @onclick="() => DetailsClicked.InvokeAsync(row.Id)">
                                             <i class="hydra-icon bi bi-eye"></i>
                                         </button>
@@ -95,7 +97,7 @@ else
                                 @foreach (var column in VisibleColumns)
                                 {
                                     <td class="hydra-grid__cell">
-                                        @row.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name)
+                                        @CellText(row, column)
                                     </td>
                                 }
 
@@ -141,7 +143,7 @@ else
     /// süzer. Tüm veri setinde arama için Filtreler panelini kullanın.</summary>
     [Parameter] public bool ShowSearchBox { get; set; } = true;
 
-    [Parameter] public string SearchPlaceholder { get; set; } = "Bu sayfada ara...";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search this page...";
 
     /// <summary>Toolbar'da "1-10 / 142" biçiminde kayıt sayacı gösterir.</summary>
     [Parameter] public bool ShowRecordCount { get; set; } = true;
@@ -149,6 +151,14 @@ else
     private string _searchText = string.Empty;
 
     private bool ShowDetailsColumn => ShowDetailsColumnIfBound && DetailsClicked.HasDelegate;
+
+    /// <summary>Hücrenin ham değerini kolonun metadata'sına göre okunabilir metne çevirir
+    /// (enum 0/1/2 → isim, boolean → Evet/Hayır). Bkz. LookupService.GetDisplayText.</summary>
+    private string? CellText(RowDTO row, MetaColumnDTO column)
+        => Lookup.GetDisplayText(column, RawValue(row, column));
+
+    private static object? RawValue(RowDTO row, MetaColumnDTO column)
+        => row.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name);
 
     private List<MetaColumnDTO> VisibleColumns => Table == null
         ? new List<MetaColumnDTO>()
@@ -172,12 +182,11 @@ else
             var term = _searchText.Trim();
             var columns = VisibleColumns;
 
+            //Ham değil, GÖRÜNEN metin üzerinden ara — böylece "Error" yazınca enum'u 0/1/2
+            //olarak saklanmış satırlar da bulunur.
             return Table.Rows
                 .Where(row => columns.Any(c =>
-                {
-                    var value = row.GetValueByColumnName(c.BelongsToJoins ? c.Alias : c.Name);
-                    return value?.ToString()?.Contains(term, StringComparison.OrdinalIgnoreCase) == true;
-                }))
+                    CellText(row, c)?.Contains(term, StringComparison.OrdinalIgnoreCase) == true))
                 .ToList();
         }
     }

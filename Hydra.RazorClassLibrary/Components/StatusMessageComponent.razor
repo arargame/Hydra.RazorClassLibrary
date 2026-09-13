@@ -1,0 +1,159 @@
+@using Hydra.Http
+@using Hydra.RazorClassLibrary.Services.Status
+@implements IDisposable
+@inject HydraStatusNotifier StatusNotifier
+
+@*
+    Inline counterpart of the /status/{code} page.
+
+    Drop <StatusMessageComponent /> once into a layout and every failed API call becomes visible
+    where it happened, instead of silently leaving an empty grid behind. 401/403 still take the
+    user to the full status page (the notifier handles that); everything else — a validation
+    failure, a conflict, a 500 — is shown here without dragging them off the screen they are on.
+*@
+
+@if (_notification is not null)
+{
+    <div class="hydra-status-banner @KindCssClass" role="alert">
+        <span class="hydra-status-banner__icon">@IconMarkup</span>
+
+        <div class="hydra-status-banner__body">
+            <div class="hydra-status-banner__title">
+                @_notification.Definition.Title
+                <span class="hydra-status-banner__code">@_notification.StatusCode</span>
+            </div>
+
+            <div class="hydra-status-banner__message">@_notification.Definition.UserMessage</div>
+
+            @if (_notification.Messages.Any())
+            {
+                <ul class="hydra-status-banner__details">
+                    @foreach (var detail in _notification.Messages)
+                    {
+                        <li>@detail</li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <button type="button" class="hydra-status-banner__close" title="Dismiss" @onclick="Dismiss">&times;</button>
+    </div>
+}
+
+<style>
+    .hydra-status-banner {
+        --banner-accent: #d97706;
+
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #0f172a;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid var(--banner-accent);
+        border-radius: 8px;
+    }
+
+    .hydra-status-banner--server-error { --banner-accent: #dc2626; }
+    .hydra-status-banner--redirect { --banner-accent: #2563eb; }
+    .hydra-status-banner--success { --banner-accent: #059669; }
+
+    .hydra-status-banner__icon { color: var(--banner-accent); line-height: 0; padding-top: 2px; }
+
+    .hydra-status-banner__body { flex: 1 1 auto; min-width: 0; }
+
+    .hydra-status-banner__title { font-weight: 600; }
+
+    .hydra-status-banner__code {
+        margin-left: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748b;
+    }
+
+    .hydra-status-banner__message { color: #475569; }
+
+    .hydra-status-banner__details {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .hydra-status-banner__close {
+        flex: 0 0 auto;
+        padding: 0 4px;
+        font-size: 20px;
+        line-height: 1;
+        color: #94a3b8;
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .hydra-status-banner__close:hover { color: #0f172a; }
+
+    @@media (prefers-color-scheme: dark) {
+        .hydra-status-banner {
+            color: #f1f5f9;
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        .hydra-status-banner__message { color: #cbd5e1; }
+        .hydra-status-banner__close:hover { color: #f1f5f9; }
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Status codes this banner ignores. 401/403 default to being ignored here because the
+    /// notifier already routes them to the full status page — showing both would double up.
+    /// </summary>
+    [Parameter]
+    public int[] IgnoredStatusCodes { get; set; } = new[] { 401, 403 };
+
+    private HydraStatusNotification? _notification;
+
+    protected override void OnInitialized()
+    {
+        StatusNotifier.OnStatus += HandleStatus;
+    }
+
+    private void HandleStatus(HydraStatusNotification notification)
+    {
+        if (IgnoredStatusCodes.Contains(notification.StatusCode))
+            return;
+
+        _notification = notification;
+
+        // The notification can arrive from a background continuation, so hop back onto the
+        // renderer's synchronization context before touching component state.
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Dismiss()
+    {
+        _notification = null;
+        StatusNotifier.Clear();
+    }
+
+    private string KindCssClass => _notification?.Definition.Kind switch
+    {
+        HydraStatusKind.ServerError => "hydra-status-banner--server-error",
+        HydraStatusKind.Redirect => "hydra-status-banner--redirect",
+        HydraStatusKind.Success => "hydra-status-banner--success",
+        _ => string.Empty
+    };
+
+    private MarkupString IconMarkup => new MarkupString(StatusIcons.Svg(_notification?.Definition.Icon, size: 18));
+
+    public void Dispose()
+    {
+        StatusNotifier.OnStatus -= HandleStatus;
+    }
+}

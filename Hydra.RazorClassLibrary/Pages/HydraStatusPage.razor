@@ -1,0 +1,213 @@
+@page "/status/{Code:int}"
+@using Hydra.Http
+@using Hydra.RazorClassLibrary.Services.Status
+@inject NavigationManager Navigation
+@inject HydraStatusNotifier StatusNotifier
+
+@*
+    The single page every HTTP status code in a Hydra application lands on.
+
+    Everything it shows — title, sentence, tone, whether a retry makes sense — comes from
+    HydraStatusCatalog in Hydra core, so adding or re-wording a code is a one-file change that
+    every Hydra-based application inherits at once. This page itself contains no per-code text.
+*@
+
+<PageTitle>@_definition.Title</PageTitle>
+
+<div class="hydra-status @KindCssClass">
+    <div class="hydra-status__card">
+        <div class="hydra-status__icon">
+            @IconMarkup
+        </div>
+
+        <div class="hydra-status__code">@Code</div>
+
+        <h1 class="hydra-status__title">@_definition.Title</h1>
+
+        <p class="hydra-status__message">@_definition.UserMessage</p>
+
+        @if (_details.Any())
+        {
+            <ul class="hydra-status__details">
+                @foreach (var detail in _details)
+                {
+                    <li>@detail</li>
+                }
+            </ul>
+        }
+
+        <div class="hydra-status__actions">
+            @if (Code == 401)
+            {
+                <button type="button" class="hydra-status__button hydra-status__button--primary" @onclick="GoToLogin">Sign In</button>
+            }
+            else if (_definition.IsRetryable)
+            {
+                <button type="button" class="hydra-status__button hydra-status__button--primary" @onclick="Retry">Try Again</button>
+            }
+
+            <button type="button" class="hydra-status__button" @onclick="GoHome">Go to Dashboard</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hydra-status {
+        --status-accent: #64748b;
+        --status-bg: #f8fafc;
+        --status-card: #ffffff;
+        --status-text: #0f172a;
+        --status-muted: #64748b;
+        --status-border: #e2e8f0;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        padding: 24px 16px;
+        background: var(--status-bg);
+        color: var(--status-text);
+    }
+
+    .hydra-status--client-error { --status-accent: #d97706; }
+    .hydra-status--server-error { --status-accent: #dc2626; }
+    .hydra-status--redirect { --status-accent: #2563eb; }
+    .hydra-status--success { --status-accent: #059669; }
+
+    .hydra-status__card {
+        width: 100%;
+        max-width: 520px;
+        padding: 32px 28px;
+        text-align: center;
+        background: var(--status-card);
+        border: 1px solid var(--status-border);
+        border-top: 4px solid var(--status-accent);
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+    }
+
+    .hydra-status__icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 16px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--status-accent) 12%, transparent);
+        color: var(--status-accent);
+    }
+
+    .hydra-status__code {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: .12em;
+        color: var(--status-muted);
+    }
+
+    .hydra-status__title {
+        margin: 4px 0 12px;
+        font-size: 22px;
+        line-height: 1.3;
+    }
+
+    .hydra-status__message {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--status-muted);
+    }
+
+    .hydra-status__details {
+        margin: 16px 0 0;
+        padding: 12px 16px;
+        text-align: left;
+        list-style: none;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--status-muted);
+        background: var(--status-bg);
+        border-radius: 8px;
+    }
+
+    .hydra-status__details li + li { margin-top: 6px; }
+
+    .hydra-status__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 24px;
+    }
+
+    .hydra-status__button {
+        padding: 9px 18px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--status-text);
+        background: transparent;
+        border: 1px solid var(--status-border);
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .hydra-status__button:hover { background: var(--status-bg); }
+
+    .hydra-status__button--primary {
+        color: #ffffff;
+        background: var(--status-accent);
+        border-color: var(--status-accent);
+    }
+
+    .hydra-status__button--primary:hover { filter: brightness(.94); }
+
+    @@media (prefers-color-scheme: dark) {
+        .hydra-status {
+            --status-bg: #0f172a;
+            --status-card: #1e293b;
+            --status-text: #f1f5f9;
+            --status-muted: #94a3b8;
+            --status-border: #334155;
+        }
+
+        .hydra-status__button:hover { background: #334155; }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int Code { get; set; }
+
+    private HydraStatusDefinition _definition = HydraStatusCatalog.Get(500);
+
+    private List<string> _details = new();
+
+    protected override void OnParametersSet()
+    {
+        _definition = HydraStatusCatalog.Get(Code);
+
+        // If we arrived here from a failed API call, show what the server actually said
+        // underneath the generic sentence — but only when it belongs to this same code.
+        var last = StatusNotifier.Last;
+
+        _details = last is not null && last.StatusCode == Code
+            ? last.Messages.ToList()
+            : new List<string>();
+    }
+
+    private string KindCssClass => _definition.Kind switch
+    {
+        HydraStatusKind.ClientError => "hydra-status--client-error",
+        HydraStatusKind.ServerError => "hydra-status--server-error",
+        HydraStatusKind.Redirect => "hydra-status--redirect",
+        _ => "hydra-status--success"
+    };
+
+    private MarkupString IconMarkup => new MarkupString(StatusIcons.Svg(_definition.Icon));
+
+    private void GoHome() => Navigation.NavigateTo("/Dashboard");
+
+    private void GoToLogin() => Navigation.NavigateTo("/Login");
+
+    private void Retry() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+}

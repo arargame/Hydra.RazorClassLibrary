@@ -1,0 +1,81 @@
+@using Hydra.DTOs
+@using Microsoft.AspNetCore.Components.Forms
+
+@* Entity-agnostic file picker: reads the selected file(s) into a FileUploadDTO in the browser
+   and hands it to the parent via FileSelected — the parent decides when/how to actually POST it
+   (typically via CustomFileClient.UploadAsync, see Hydra.RazorClassLibrary/Services/Core).
+   Adapted from a working Blazor InputFile pattern in the GedenLines codebase
+   (Blazor.GedenLines/Pages/Components/FileUploadComponent.razor).
+   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+
+<div class="hydra-fileupload">
+    @if (IsMultiple)
+    {
+        <InputFile class="hydra-input" OnChange="OnInputFileChangeAsync" multiple disabled="@IsBusy" />
+    }
+    else
+    {
+        <InputFile class="hydra-input" OnChange="OnInputFileChangeAsync" disabled="@IsBusy" />
+    }
+
+    <div class="hydra-fileupload__status">
+        @if (IsBusy)
+        {
+            <span>Okunuyor…</span>
+        }
+        else if (selectedFiles is { Count: > 0 })
+        {
+            <span>@selectedFiles.Count dosya seçildi</span>
+        }
+        else
+        {
+            <span>Dosya seçilmedi</span>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>Attached where the uploaded file(s) will belong — CustomFile.EntityType.</summary>
+    [Parameter] public string? EntityType { get; set; }
+
+    /// <summary>Attached where the uploaded file(s) will belong — CustomFile.EntityId.</summary>
+    [Parameter] public string? EntityId { get; set; }
+
+    [Parameter] public bool IsMultiple { get; set; }
+
+    /// <summary>Caps how much a single file's stream will read (mirrors InputFile's own guard).</summary>
+    [Parameter] public long MaxFileSizeInBytes { get; set; } = 20 * 1024 * 1024; // 20 MB
+
+    [Parameter] public EventCallback<FileUploadDTO> FileSelected { get; set; }
+
+    private IReadOnlyList<IBrowserFile>? selectedFiles;
+    private bool IsBusy { get; set; }
+
+    private async Task OnInputFileChangeAsync(InputFileChangeEventArgs e)
+    {
+        IsBusy = true;
+
+        try
+        {
+            selectedFiles = IsMultiple ? e.GetMultipleFiles() : new[] { e.File };
+
+            var uploadDTO = new FileUploadDTO(EntityType, EntityId);
+
+            foreach (var browserFile in selectedFiles)
+            {
+                using var stream = browserFile.OpenReadStream(maxAllowedSize: MaxFileSizeInBytes);
+                using var memoryStream = new MemoryStream();
+
+                await stream.CopyToAsync(memoryStream);
+
+                uploadDTO.Items.Add(new FileUploadItemDTO(browserFile.Name, memoryStream.ToArray()));
+            }
+
+            await FileSelected.InvokeAsync(uploadDTO);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+}

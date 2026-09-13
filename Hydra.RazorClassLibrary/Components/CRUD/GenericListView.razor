@@ -10,9 +10,16 @@
    isimleriyle taşınır — hydra-btn--create / --edit / --delete / --details — böylece her proje
    kendi paletini uygulayabilir. *@
 
-@if (Table == null)
+@if (IsLoading)
 {
     <SpinnerComponent />
+}
+else if (Table == null)
+{
+    <div class="hydra-grid__empty">
+        <i class="hydra-icon bi bi-exclamation-triangle"></i>
+        <span>Unable to load data. Please check your connection and try again.</span>
+    </div>
 }
 else
 {
@@ -93,6 +100,7 @@ else
     [Parameter] public string? BasePath { get; set; }
 
     private TableDTO? Table { get; set; }
+    private bool IsLoading = true;
     private bool ShowFilters;
     private bool ShowDeleteConfirm;
     private Guid PendingDeleteId;
@@ -108,10 +116,18 @@ else
 
     private async Task LoadDataAsync()
     {
-        // Table null ise varsayılan istek; doluysa (sayfalama/filtre/sıralama) state'i taşır
-        var request = Table ?? new TableDTO { Name = Client.Controller, ViewType = Hydra.DTOs.ViewDTOs.ViewType.ListView };
+        IsLoading = true;
+        try
+        {
+            // Table null ise varsayılan istek; doluysa (sayfalama/filtre/sıralama) state'i taşır
+            var request = Table ?? new TableDTO { Name = Client.Controller, ViewType = Hydra.DTOs.ViewDTOs.ViewType.ListView };
 
-        Table = await Client.SelectAsync(request);
+            Table = await Client.SelectAsync(request);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task OnTableChanged(TableDTO updatedTable)

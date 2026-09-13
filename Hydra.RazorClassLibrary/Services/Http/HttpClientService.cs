@@ -1,5 +1,8 @@
 using Hydra.RazorClassLibrary.Services.Logging;
+using Hydra.RazorClassLibrary.Services.Status;
+using Hydra.RazorClassLibrary.Services.Storage;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Hydra.Http;
@@ -8,25 +11,75 @@ namespace Hydra.RazorClassLibrary.Services.Http
 {
     public class HttpClientService : IHttpClientService
     {
+        private const string AuthTokenKey = "authToken";
+
         private readonly HttpClient _httpClient;
         private readonly IClientLogService _clientLogService;
+        private readonly HydraStatusNotifier _statusNotifier;
+        private readonly ILocalStorageService _localStorage;
         private readonly JsonSerializerOptions _jsonOptions;
 
-        public HttpClientService(HttpClient httpClient, IClientLogService clientLogService)
+        public HttpClientService(HttpClient httpClient,
+                                 IClientLogService clientLogService,
+                                 HydraStatusNotifier statusNotifier,
+                                 ILocalStorageService localStorage)
         {
             _httpClient = httpClient;
             _clientLogService = clientLogService;
+            _statusNotifier = statusNotifier;
+            _localStorage = localStorage;
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             };
         }
 
+        public Uri? BaseAddress => _httpClient.BaseAddress;
+
+        /// <summary>
+        /// Attaches the bearer token stored at login to every outgoing request.
+        ///
+        /// Without this the API's deny-by-default filter sees every call as anonymous and answers
+        /// 401 — the token was being written to local storage at login and then never used.
+        /// The HttpClient is registered Scoped, so in Blazor Server these headers belong to a
+        /// single circuit (a single user) and cannot leak across connections.
+        /// </summary>
+        private async Task EnsureAuthorizationHeaderAsync()
+        {
+            try
+            {
+                var token = await _localStorage.GetItemAsync<string>(AuthTokenKey);
+
+                _httpClient.DefaultRequestHeaders.Authorization = string.IsNullOrWhiteSpace(token)
+                    ? null
+                    : new AuthenticationHeaderValue("Bearer", token);
+            }
+            catch
+            {
+                // Local storage needs JS interop, which is unavailable during prerendering.
+                // A missing header is handled properly downstream (401 → status page), so this
+                // must not throw.
+            }
+        }
+
         public async Task<TResponse?> GetAsync<TResponse>(string url)
         {
             try
             {
-                return await _httpClient.GetFromJsonAsync<TResponse>(url, _jsonOptions);
+                await EnsureAuthorizationHeaderAsync();
+
+                var response = await _httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    await ReportFailureAsync(response, url);
+                    return default;
+                }
+
+                if (response.Content.Headers.ContentLength == 0)
+                    return default;
+
+                return await response.Content.ReadFromJsonAsync<TResponse>(_jsonOptions);
             }
             catch (HttpRequestException ex)
             {
@@ -49,8 +102,22 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
+                await EnsureAuthorizationHeaderAsync();
+
                 var response = await _httpClient.PostAsJsonAsync(url, data, _jsonOptions);
-                response.EnsureSuccessStatusCode();
+
+                //EnsureSuccessStatusCode() BURADAN KALDIRILDI.
+                //Sebep: sunucu artık reddi gerçek bir HTTP koduyla (401/403) döndürüyor ama
+                //gövdede yine standart ResponseObject var. Exception fırlatmak, kullanıcıya
+                //gösterilecek tek anlamlı bilgiyi (envelope'taki mesajı) çöpe atıyordu.
+                //Artık gövde her durumda okunmaya çalışılıyor; başarısızlık çağırana
+                //ResponseObject.Success=false olarak ulaşıyor.
+                if (!response.IsSuccessStatusCode)
+                {
+                    await ReportFailureAsync(response, url);
+
+                    return await TryReadBodyAsync<TResponse>(response);
+                }
 
                 if (response.Content.Headers.ContentLength == 0)
                     return default;
@@ -78,8 +145,12 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
+                await EnsureAuthorizationHeaderAsync();
+
                 var response = await _httpClient.PostAsJsonAsync(url, data, _jsonOptions);
-                response.EnsureSuccessStatusCode();
+
+                if (!response.IsSuccessStatusCode)
+                    await ReportFailureAsync(response, url);
             }
             catch (HttpRequestException ex)
             {
@@ -102,10 +173,18 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
-                var response = await _httpClient.PutAsJsonAsync(url, data, _jsonOptions);
-                response.EnsureSuccessStatusCode();
+                await EnsureAuthorizationHeaderAsync();
 
-                 if (response.Content.Headers.ContentLength == 0)
+                var response = await _httpClient.PutAsJsonAsync(url, data, _jsonOptions);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    await ReportFailureAsync(response, url);
+
+                    return await TryReadBodyAsync<TResponse>(response);
+                }
+
+                if (response.Content.Headers.ContentLength == 0)
                     return default;
 
                 return await response.Content.ReadFromJsonAsync<TResponse>(_jsonOptions);
@@ -131,10 +210,18 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
-                var response = await _httpClient.DeleteAsync(url);
-                response.EnsureSuccessStatusCode();
+                await EnsureAuthorizationHeaderAsync();
 
-                 if (response.Content.Headers.ContentLength == 0)
+                var response = await _httpClient.DeleteAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    await ReportFailureAsync(response, url);
+
+                    return await TryReadBodyAsync<TResponse>(response);
+                }
+
+                if (response.Content.Headers.ContentLength == 0)
                     return default;
 
                 return await response.Content.ReadFromJsonAsync<TResponse>(_jsonOptions);
@@ -167,32 +254,13 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
-                // We fetch ResponseObject<T> which matches the standard Hydra envelope
-                var response = await _httpClient.GetFromJsonAsync<ResponseObject<T>>(url, _jsonOptions);
+                await EnsureAuthorizationHeaderAsync();
 
-                if (response == null)
-                {
-                    await _clientLogService.LogErrorAsync($"Empty response from {url}", null, url, null);
-                    return default;
-                }
+                //GetFromJsonAsync yerine GetAsync: önceki hâli 4xx'te exception fırlatıyordu ve
+                //gövdedeki envelope hiç okunmuyordu.
+                var response = await _httpClient.GetAsync(url);
 
-                if (!response.Success)
-                {
-                   // Create a robust log message including messages from the response
-                   // Extracting messages safely
-                   var messages = response.Messages != null 
-                        ? string.Join("; ", response.Messages.Select(m => m.Text)) 
-                        : "No error messages provided.";
-
-                   // Log as Warning because it's a handled business error, not a crash
-                   await _clientLogService.LogWarningAsync(
-                        message: $"Business Failure at {url}: {messages}"
-                   );
-                   
-                   return default;
-                }
-
-                return response.Data;
+                return await HandleResponseEnvelope<T>(response, url);
             }
             catch (Exception ex)
             {
@@ -211,6 +279,8 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
+                await EnsureAuthorizationHeaderAsync();
+
                 var response = await _httpClient.PostAsJsonAsync(url, payload, _jsonOptions);
                 return await HandleResponseEnvelope<T>(response, url);
             }
@@ -231,6 +301,8 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
+                await EnsureAuthorizationHeaderAsync();
+
                 var response = await _httpClient.PutAsJsonAsync(url, payload, _jsonOptions);
                 return await HandleResponseEnvelope<T>(response, url);
             }
@@ -251,6 +323,8 @@ namespace Hydra.RazorClassLibrary.Services.Http
         {
             try
             {
+                await EnsureAuthorizationHeaderAsync();
+
                 var response = await _httpClient.DeleteAsync(url);
                 return await HandleResponseEnvelope<T>(response, url);
             }
@@ -263,58 +337,134 @@ namespace Hydra.RazorClassLibrary.Services.Http
 
         private async Task<T?> HandleResponseEnvelope<T>(HttpResponseMessage response, string url)
         {
-            // If the server returns 4xx/5xx, it might still return a ResponseObject compliant JSON.
-            // But typically, a crash (500) might return HTML or pure text.
-            // Let's check status code first for critical failures.
-            
+            //Hydra sözleşmesi: gövde HER ZAMAN bir ResponseObject. Sunucu artık reddi gerçek
+            //HTTP koduyla da bildirdiği için, 4xx/5xx gelse bile gövdeyi okuyup içindeki
+            //mesajları kullanıcıya ulaştırıyoruz — eskiden bu durumda gövde okunmadan
+            //default dönülüyor, kullanıcı boş bir ekran görüyordu.
             if (!response.IsSuccessStatusCode)
             {
-                 // If it's a pure HTTP error (e.g. 404, 500) without our envelope
-                 // We use the existing error handlers
-                 if (response.StatusCode >= HttpStatusCode.InternalServerError)
-                 {
-                     await _clientLogService.LogErrorAsync($"Server Error: {url}", response.ReasonPhrase, url, (int)response.StatusCode);
-                     return default;
-                 }
-                 else
-                 {
-                     // 4xx errors - usually client side, log to console
-                     Console.WriteLine($"Client Error {response.StatusCode}: {url}");
-                     return default;
-                 }
+                await ReportFailureAsync(response, url);
+                return default;
             }
-            
+
             if (response.Content.Headers.ContentLength == 0)
             {
-                 await _clientLogService.LogErrorAsync($"Empty response from {url}", null, url, null);
-                 return default;
+                await _clientLogService.LogErrorAsync($"Empty response from {url}", null, url, null);
+                return default;
             }
 
             var jsonString = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"[HttpClientService] Raw JSON from {url}: {jsonString}");
 
-            var envelope = JsonSerializer.Deserialize<ResponseObject<T>>(jsonString, _jsonOptions);
+            var envelope = TryDeserializeEnvelope<T>(jsonString);
 
             if (envelope == null)
             {
-                 await _clientLogService.LogErrorAsync($"Null envelope from {url}", null, url, null);
-                 return default;
+                await _clientLogService.LogErrorAsync($"Null envelope from {url}", null, url, null);
+                return default;
             }
 
             if (!envelope.Success)
             {
-               var messages = envelope.Messages != null 
-                    ? string.Join("; ", envelope.Messages.Select(m => m.Text)) 
-                    : "No error messages provided.";
+                var messages = CollectMessages(envelope);
 
-               await _clientLogService.LogWarningAsync(
-                    message: $"Business Failure at {url}: {messages}"
-               );
-               
-               return default;
+                await _clientLogService.LogWarningAsync(
+                     message: $"Business Failure at {url}: {string.Join("; ", messages)}");
+
+                //İş kuralı hatası da kullanıcıya gösterilmeli. Envelope kendi kodunu taşıyorsa
+                //onu kullan, taşımıyorsa 400 (Bad Request) olarak sınıflandır.
+                _statusNotifier.Raise(envelope.StatusCode ?? 400, messages, url);
+
+                return default;
             }
 
             return envelope.Data;
+        }
+
+        /// <summary>
+        /// Turns a non-2xx response into a user-visible status notification, preferring the
+        /// envelope's own messages when the server sent one.
+        /// </summary>
+        private async Task ReportFailureAsync(HttpResponseMessage response, string url)
+        {
+            var statusCode = (int)response.StatusCode;
+
+            var messages = new List<string>();
+
+            try
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+
+                if (!string.IsNullOrWhiteSpace(jsonString))
+                {
+                    var envelope = TryDeserializeEnvelope<object>(jsonString);
+
+                    if (envelope != null)
+                    {
+                        messages.AddRange(CollectMessages(envelope));
+
+                        //Gövdedeki kod, HTTP kodundan daha spesifik olabilir (ör. 200 dönen ama
+                        //içinde 409 taşıyan eski uçlar).
+                        if (envelope.StatusCode.HasValue)
+                            statusCode = envelope.StatusCode.Value;
+                    }
+                }
+            }
+            catch
+            {
+                // Body was not our envelope (an HTML error page, a proxy response). The status
+                // code alone is still enough to tell the user something useful.
+            }
+
+            if (statusCode >= (int)HttpStatusCode.InternalServerError)
+            {
+                await _clientLogService.LogErrorAsync($"Server Error: {url}", response.ReasonPhrase, url, statusCode);
+            }
+            else
+            {
+                await _clientLogService.LogWarningAsync($"Client Error {statusCode}: {url}");
+            }
+
+            _statusNotifier.Raise(statusCode, messages, url);
+        }
+
+        private async Task<T?> TryReadBodyAsync<T>(HttpResponseMessage response)
+        {
+            try
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrWhiteSpace(jsonString))
+                    return default;
+
+                return JsonSerializer.Deserialize<T>(jsonString, _jsonOptions);
+            }
+            catch
+            {
+                return default;
+            }
+        }
+
+        private ResponseObject<T>? TryDeserializeEnvelope<T>(string jsonString)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<ResponseObject<T>>(jsonString, _jsonOptions);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static List<string> CollectMessages(ResponseObject envelope)
+        {
+            if (envelope.Messages == null)
+                return new List<string>();
+
+            return envelope.Messages
+                           .Where(m => !m.ShowWhenSuccess && !string.IsNullOrWhiteSpace(m.Text))
+                           .Select(m => m.Text!)
+                           .ToList();
         }
 
         // Error handling helper methods
@@ -336,6 +486,8 @@ namespace Hydra.RazorClassLibrary.Services.Http
             {
                 Console.WriteLine($"Client Error {statusCode}: {url} - {ex.Message}");
             }
+
+            _statusNotifier.Raise((int?)statusCode ?? 500, new[] { ex.Message }, url);
         }
 
         private async Task HandleTimeout(TaskCanceledException ex, string url)
@@ -346,6 +498,8 @@ namespace Hydra.RazorClassLibrary.Services.Http
                 stackTrace: ex.ToString(),
                 url: url,
                 statusCode: 408); // Request Timeout
+
+            _statusNotifier.Raise(408, null, url);
         }
 
         private async Task HandleUnexpectedError(Exception ex, string url)
@@ -355,6 +509,8 @@ namespace Hydra.RazorClassLibrary.Services.Http
                 message: $"Unexpected Error: {url}",
                 stackTrace: ex.ToString(),
                 url: url);
+
+            _statusNotifier.Raise(500, new[] { ex.Message }, url);
         }
     }
 }

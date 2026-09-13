@@ -26,19 +26,21 @@ namespace Hydra.RazorClassLibrary.Services.Authentication
 
         public async Task<LoginViewDTO?> Login(LoginViewDTO loginModel)
         {
-            // Login endpoint expects LoginViewDTO, returns ResponseObject<LoginViewDTO>
-            // Note: Adjust URL if base address is not set globally, but HttpClient usually has BaseAddress.
-            var response = await _httpClient.PostAsync<LoginViewDTO, ResponseObject<LoginViewDTO>>("api/SystemUser/Login", loginModel);
+            //URL'de "api/" ÖN EKİ YOK: HttpClient'ın BaseAddress'i zaten ".../api/" ile bitiyor
+            //(bkz. Blazor Program.cs) ve diğer bütün çağrılar UrlHelper.BuildUrl ile
+            //"Controller/Action" biçiminde üretiliyor. Önceki "api/SystemUser/Login" değeri
+            //".../api/api/SystemUser/Login" adresine çıkıyordu — yani login isteği 404 alıyordu.
+            var response = await _httpClient.PostAsync<LoginViewDTO, ResponseObject<LoginViewDTO>>("SystemUser/Login", loginModel);
 
             if (response != null && response.Success && response.Data != null)
             {
                 var resultDto = response.Data;
-                
+
                 // Save token to local storage
                 if (!string.IsNullOrEmpty(resultDto.Token))
                 {
                     await _localStorage.SetItemAsync(AuthTokenKey, resultDto.Token);
-                    
+
                     // Notify auth state provider
                     if (_authStateProvider is HydraAuthenticationStateProvider hydraAuth)
                     {
@@ -49,13 +51,16 @@ namespace Hydra.RazorClassLibrary.Services.Authentication
                 return resultDto;
             }
 
+            //Başarısız login artık sunucudan 401 + ResponseObject olarak geliyor; HttpClientService
+            //gövdeyi okuyup HydraStatusNotifier üzerinden mesajı ekrana taşıyor. Burada null
+            //dönmek, çağıran sayfanın "giriş başarısız" durumunu ele almasını sağlıyor.
             return null;
         }
 
         public async Task Logout()
         {
             // Call API Logout if necessary (optional depending on API design)
-            // await _httpClient.PostAsync("api/SystemUser/Logout", null);
+            // await _httpClient.PostAsync("SystemUser/Logout", null);
 
             await _localStorage.RemoveItemAsync(AuthTokenKey);
 

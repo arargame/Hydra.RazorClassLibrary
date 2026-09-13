@@ -138,6 +138,19 @@
     border-color: var(--hydra-primary);
 }
 
+/* ----------------------------------------------------------- FileUpload */
+
+.hydra-fileupload {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.hydra-fileupload__status {
+    font-size: 0.75rem;
+    color: var(--hydra-text-muted);
+}
+
 /* -------------------------------------------------------------- FilterBar */
 
 .hydra-filterbar {

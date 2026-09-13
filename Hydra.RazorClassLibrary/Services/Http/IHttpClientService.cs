@@ -8,6 +8,14 @@ namespace Hydra.RazorClassLibrary.Services.Http
 {
     public interface IHttpClientService
     {
+        /// <summary>
+        /// The API's base address (as configured on the underlying HttpClient). Needed to turn
+        /// a relative controller/action pair into an absolute URL — e.g. for a real HTTP file
+        /// download link (see CustomFileClient.GetDownloadUrl), which can't go through the
+        /// envelope methods below since the response isn't JSON.
+        /// </summary>
+        Uri? BaseAddress { get; }
+
         Task<TResponse?> GetAsync<TResponse>(string url);
         Task<TResponse?> PostAsync<TRequest, TResponse>(string url, TRequest data);
         Task<TResponse?> PutAsync<TRequest, TResponse>(string url, TRequest data);

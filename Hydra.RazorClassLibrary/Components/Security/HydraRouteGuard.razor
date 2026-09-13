@@ -1,0 +1,177 @@
+@using System.Linq
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using Hydra.AccessManagement.Authorization
+@using Hydra.RazorClassLibrary.Security
+@inject NavigationManager Navigation
+
+@*
+    Deny-by-default routing for the client, mirroring what PermissionAuthorizationFilter does on
+    the server.
+
+    Blazor has no "every page requires authentication" switch: <AuthorizeRouteView> only enforces
+    pages that carry [Authorize], so a page nobody remembered to decorate stays wide open. That is
+    the wrong default for an admin application — forgetting an attribute should not silently
+    publish a screen. This guard inverts it: every route requires a signed-in user unless the page
+    explicitly opts out with [AllowAnonymous] or its path is in AnonymousPaths.
+
+    Three outcomes:
+      * not signed in            → sent to the login page, with returnUrl so they land where they meant to go
+      * signed in, no permission → the shared /status/403 page ("permission denied")
+      * otherwise                → the page renders
+
+    PRERENDER: identity lives in the browser's local storage, which needs JS interop, which does
+    not exist during prerendering. So the guard does NOT decide while prerendering — it renders
+    nothing and waits for the first interactive render. Deciding early would mean treating every
+    visitor as anonymous and bouncing them to the login page before their token could be read.
+
+    Public routes are the exception: they need no identity to be judged, so they render during
+    prerendering too. That matters because pages like Home and Login load their CSS through
+    <HeadContent>, which only reaches <HeadOutlet /> on the prerender pass.
+
+    This is display logic. Every screen it lets through still gets its data through the API, which
+    re-checks the same permissions on every request.
+*@
+
+@if (_decision == Decision.Allowed)
+{
+    <RouteView RouteData="RouteData" DefaultLayout="DefaultLayout" />
+}
+else if (_decision == Decision.Pending)
+{
+    @Loading
+}
+
+@code {
+    [Parameter, EditorRequired] public RouteData RouteData { get; set; } = default!;
+
+    [Parameter] public Type? DefaultLayout { get; set; }
+
+    /// <summary>Rendered while the auth state cannot be read yet. Keep it quiet — it flashes.</summary>
+    [Parameter] public RenderFragment? Loading { get; set; }
+
+    /// <summary>Paths reachable without signing in, matched case-insensitively on the first segment.</summary>
+    [Parameter] public string[] AnonymousPaths { get; set; } = new[] { "", "login", "status", "error" };
+
+    [Parameter] public string LoginPath { get; set; } = "Login";
+
+    [Parameter] public string ForbiddenPath { get; set; } = "status/403";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private enum Decision { Pending, Allowed, Denied }
+
+    private Decision _decision = Decision.Pending;
+
+    /// <summary>
+    /// False until the first interactive render. While false we are either prerendering or doing
+    /// static SSR, and local storage — where the token lives — is unreachable.
+    /// </summary>
+    private bool _canReadIdentity;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // A public route needs no identity, so it can be judged immediately — including during
+        // prerendering, which is what keeps Home/Login's <HeadContent> (Tailwind, fonts) working.
+        if (IsAnonymousAllowed())
+        {
+            _decision = Decision.Allowed;
+            return;
+        }
+
+        if (!_canReadIdentity)
+        {
+            _decision = Decision.Pending;
+            return;
+        }
+
+        await EvaluateAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // OnAfterRenderAsync never runs while prerendering, so reaching here means the component
+        // is live in the browser and local storage can be read.
+        if (!firstRender)
+            return;
+
+        _canReadIdentity = true;
+
+        if (_decision != Decision.Pending)
+            return;
+
+        await EvaluateAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task EvaluateAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            // No CascadingAuthenticationState above us — fail closed rather than pretending.
+            _decision = Decision.Denied;
+            RedirectTo(LoginPath);
+            return;
+        }
+
+        var state = await AuthenticationStateTask;
+        var user = state.User;
+
+        if (!user.IsSignedIn())
+        {
+            _decision = Decision.Denied;
+            RedirectToLogin();
+            return;
+        }
+
+        var required = RouteData.PageType
+                                .GetCustomAttributes(typeof(HydraRequirePermissionAttribute), inherit: true)
+                                .Cast<HydraRequirePermissionAttribute>()
+                                .FirstOrDefault();
+
+        if (required is not null && !user.CanAccessEndpoint(required.Controller, required.Action))
+        {
+            _decision = Decision.Denied;
+            RedirectTo(ForbiddenPath);
+            return;
+        }
+
+        _decision = Decision.Allowed;
+    }
+
+    private bool IsAnonymousAllowed()
+    {
+        if (RouteData.PageType.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true).Any())
+            return true;
+
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+        // Compare on the first path segment so "/status/403" matches "status" and query strings
+        // or route parameters never change the answer.
+        var firstSegment = relative.Split('?', '#')[0].Split('/').FirstOrDefault() ?? string.Empty;
+
+        return AnonymousPaths.Any(p => string.Equals(p, firstSegment, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void RedirectToLogin()
+    {
+        var returnUrl = Uri.EscapeDataString(Navigation.ToBaseRelativePath(Navigation.Uri));
+
+        RedirectTo($"{LoginPath}?returnUrl={returnUrl}");
+    }
+
+    private void RedirectTo(string path)
+    {
+        try
+        {
+            Navigation.NavigateTo(path, forceLoad: false, replace: true);
+        }
+        catch
+        {
+            // NavigateTo throws a NavigationException if this ever runs outside an interactive
+            // render. A guard that crashes the render is worse than one that renders nothing.
+        }
+    }
+}

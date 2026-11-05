@@ -54,6 +54,9 @@ namespace Hydra.RazorClassLibrary.Utils
             // FK / enum / boolean dropdown seçenekleri
             services.AddScoped<LookupService>();
 
+            // Kullanıcı grid/filtre görünüm state ve tercih yöneticisi (Sayfalar arası filtre koruma)
+            services.AddScoped<ITableStateManager, TableStateManager>();
+
             return services;
         }
     }

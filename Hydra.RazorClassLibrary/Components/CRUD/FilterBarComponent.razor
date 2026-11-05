@@ -83,16 +83,20 @@
         {
             var key = FieldKey(column);
 
-            if (!_rawValues.ContainsKey(key))
-            {
-                //Mevcut filtre değerlerini (state) geri yükle
-                var parameters = column.FilterDTO?.Parameters;
+            var parameters = column.FilterDTO?.Parameters;
+            var hasActiveParam = parameters != null && parameters.Any(p => p.Value != null && !string.IsNullOrWhiteSpace(p.Value.ToString()));
 
+            if (hasActiveParam)
+            {
                 _rawValues[key] = new[]
                 {
                     parameters?.ElementAtOrDefault(0)?.Value?.ToString(),
                     parameters?.ElementAtOrDefault(1)?.Value?.ToString()
                 };
+            }
+            else if (!_rawValues.ContainsKey(key))
+            {
+                _rawValues[key] = new string?[2];
             }
 
             if (!_optionsByField.ContainsKey(key))

@@ -106,6 +106,7 @@ else
 
 @code {
     [Inject] public NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ITableStateManager StateManager { get; set; } = default!;
 
     [Parameter, EditorRequired] public ApiClient<T> Client { get; set; } = default!;
     [Parameter] public string? Title { get; set; }
@@ -166,10 +167,30 @@ else
         IsLoading = true;
         try
         {
-            // Table null ise varsayılan istek; doluysa (sayfalama/filtre/sıralama) state'i taşır
+            var isInitial = Table == null;
             var request = Table ?? new TableDTO { Name = Client.Controller, ViewType = Hydra.DTOs.ViewDTOs.ViewType.ListView };
 
+            ViewPreferenceState? savedState = null;
+            if (isInitial)
+            {
+                savedState = await StateManager.GetStateAsync(Client.Controller);
+                if (savedState != null)
+                {
+                    StateManager.ApplyStateToRequest(request, savedState);
+
+                    if (savedState.Filters.Any())
+                    {
+                        ShowFilters = true;
+                    }
+                }
+            }
+
             Table = await Client.SelectAsync(request);
+
+            if (isInitial && savedState != null && Table != null)
+            {
+                StateManager.ApplyStateToTable(Table, savedState);
+            }
         }
         finally
         {
@@ -180,6 +201,7 @@ else
     private async Task OnTableChanged(TableDTO updatedTable)
     {
         Table = updatedTable;
+        await StateManager.SaveStateAsync(Client.Controller, Table);
         await LoadDataAsync();
     }
 
@@ -210,6 +232,11 @@ else
 
     private async Task HandlePreferenceSaved(string json)
     {
+        if (Table != null)
+        {
+            await StateManager.SaveStateAsync(Client.Controller, Table);
+        }
+
         if (OnPreferenceSaved.HasDelegate)
             await OnPreferenceSaved.InvokeAsync(json);
     }

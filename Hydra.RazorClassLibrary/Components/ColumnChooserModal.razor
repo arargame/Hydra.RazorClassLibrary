@@ -1,0 +1,296 @@
+@using Hydra.DTOs
+@using Hydra.DataModels
+@using Hydra.RazorClassLibrary.ComponentModels
+
+@* DevExpress / Kurumsal DataGrid tarzı Column Chooser & Filter Chooser Modalı.
+   Kullanıcının tabloda görmek istediği sütunları ve filtre barında yer almasını
+   istediği alanları dinamik olarak açıp kapatmasını sağlar. *@
+
+@if (IsOpen)
+{
+    <div class="hydra-modal-backdrop" @onclick="Close">
+        <div class="hydra-modal hydra-modal--primary hydra-column-chooser" @onclick:stopPropagation="true">
+            <div class="hydra-modal__header">
+                <div class="hydra-modal__header-title-group">
+                    <i class="hydra-icon bi bi-layout-three-columns"></i>
+                    <h2 class="hydra-modal__title">@Title</h2>
+                </div>
+                <button type="button" class="hydra-modal__close" title="Close" @onclick="Close">
+                    <i class="hydra-icon bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="hydra-column-chooser__search-bar">
+                <div class="hydra-lookup__search">
+                    <i class="hydra-icon bi bi-search hydra-lookup__search-icon"></i>
+                    <input class="hydra-input hydra-lookup__search-input" type="search"
+                           placeholder="@SearchPlaceholder"
+                           value="@_searchText"
+                           @oninput="e => _searchText = e.Value?.ToString() ?? string.Empty" />
+                </div>
+            </div>
+
+            <div class="hydra-column-chooser__body">
+                <div class="hydra-column-chooser__table-header">
+                    <span class="hydra-column-chooser__col-name">Field / Column</span>
+                    <span class="hydra-column-chooser__col-opt">Show in Grid</span>
+                    <span class="hydra-column-chooser__col-opt">Filter Bar</span>
+                </div>
+
+                <div class="hydra-column-chooser__list">
+                    @foreach (var item in FilteredItems)
+                    {
+                        <div class="hydra-column-chooser__item">
+                            <div class="hydra-column-chooser__field-info">
+                                <span class="hydra-column-chooser__label">@item.DisplayName</span>
+                                <span class="hydra-column-chooser__prop-name">@item.ColumnName</span>
+                            </div>
+
+                            <div class="hydra-column-chooser__checkbox-cell">
+                                <input type="checkbox"
+                                       class="hydra-checkbox"
+                                       checked="@item.IsVisibleInGrid"
+                                       @onchange="e => OnGridVisibilityChanged(item, e.Value)" />
+                            </div>
+
+                            <div class="hydra-column-chooser__checkbox-cell">
+                                @if (item.SupportsFilter)
+                                {
+                                    <input type="checkbox"
+                                           class="hydra-checkbox"
+                                           checked="@item.IsVisibleInFilterBar"
+                                           @onchange="e => OnFilterVisibilityChanged(item, e.Value)" />
+                                }
+                                else
+                                {
+                                    <span class="hydra-text-muted">—</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="hydra-modal__footer hydra-column-chooser__footer">
+                <div class="hydra-column-chooser__footer-left">
+                    <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="ResetToDefaults">
+                        <i class="hydra-icon bi bi-arrow-counterclockwise"></i>
+                        <span>Reset Defaults</span>
+                    </button>
+                </div>
+                <div class="hydra-column-chooser__footer-right">
+                    <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="Close">
+                        Cancel
+                    </button>
+                    <button type="button" class="hydra-btn hydra-btn--primary" @onclick="ApplyChanges">
+                        <i class="hydra-icon bi bi-check2"></i>
+                        <span>Apply</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .hydra-column-chooser {
+        max-width: 580px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        max-height: 85vh;
+    }
+    .hydra-modal__header-title-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .hydra-column-chooser__search-bar {
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--hydra-border, rgba(255,255,255,0.08));
+    }
+    .hydra-column-chooser__body {
+        padding: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        max-height: 50vh;
+    }
+    .hydra-column-chooser__table-header {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 1.25rem;
+        background: rgba(0,0,0,0.15);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--hydra-text-muted, #818896);
+        border-bottom: 1px solid var(--hydra-border, rgba(255,255,255,0.08));
+    }
+    .hydra-column-chooser__col-name { flex: 1; }
+    .hydra-column-chooser__col-opt { width: 90px; text-align: center; }
+    .hydra-column-chooser__item {
+        display: flex;
+        align-items: center;
+        padding: 0.625rem 1.25rem;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        transition: background 0.15s ease;
+    }
+    .hydra-column-chooser__item:hover {
+        background: rgba(255,255,255,0.03);
+    }
+    .hydra-column-chooser__field-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .hydra-column-chooser__label {
+        font-weight: 500;
+        font-size: 0.875rem;
+    }
+    .hydra-column-chooser__prop-name {
+        font-size: 0.6875rem;
+        color: var(--hydra-text-muted, #818896);
+    }
+    .hydra-column-chooser__checkbox-cell {
+        width: 90px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .hydra-column-chooser__footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem 1.25rem;
+        border-top: 1px solid var(--hydra-border, rgba(255,255,255,0.08));
+    }
+    .hydra-column-chooser__footer-right {
+        display: flex;
+        gap: 0.5rem;
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    [Parameter] public TableDTO Table { get; set; } = default!;
+    [Parameter] public EventCallback<TableDTO> TableChanged { get; set; }
+
+    [Parameter] public EventCallback<string> OnPreferenceSaved { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Customize Columns & Filters";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search columns...";
+
+    private string _searchText = string.Empty;
+    private List<ColumnChooserItem> _items = new();
+
+    public class ColumnChooserItem
+    {
+        public string ColumnName { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public bool IsVisibleInGrid { get; set; }
+        public bool IsVisibleInFilterBar { get; set; }
+        public bool SupportsFilter { get; set; }
+        public MetaColumnDTO MetaColumn { get; set; } = default!;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Table?.MetaColumns == null) return;
+
+        // Primary key ve dahili join Id kolonları hariç tüm kolonları listele
+        _items = Table.MetaColumns
+            .Where(c => !c.IsPrimaryKey && !c.IsJoinedTableKey)
+            .GroupBy(c => c.Name)
+            .Select(g =>
+            {
+                var col = g.First();
+                return new ColumnChooserItem
+                {
+                    ColumnName = col.Name,
+                    DisplayName = string.IsNullOrWhiteSpace(col.DisplayName) ? col.Name : col.DisplayName,
+                    IsVisibleInGrid = col.TypeName == nameof(SelectedColumn),
+                    IsVisibleInFilterBar = col.FilterDTO != null && col.CreateViewComponentFromThis,
+                    SupportsFilter = col.FilterDTO != null,
+                    MetaColumn = col
+                };
+            })
+            .OrderBy(i => i.DisplayName)
+            .ToList();
+    }
+
+    private IEnumerable<ColumnChooserItem> FilteredItems => string.IsNullOrWhiteSpace(_searchText)
+        ? _items
+        : _items.Where(i => i.DisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                            i.ColumnName.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+    private void OnGridVisibilityChanged(ColumnChooserItem item, object? checkedValue)
+    {
+        if (checkedValue is bool b)
+            item.IsVisibleInGrid = b;
+    }
+
+    private void OnFilterVisibilityChanged(ColumnChooserItem item, object? checkedValue)
+    {
+        if (checkedValue is bool b)
+            item.IsVisibleInFilterBar = b;
+    }
+
+    private async Task ApplyChanges()
+    {
+        if (Table?.MetaColumns == null) return;
+
+        foreach (var item in _items)
+        {
+            var matchingCols = Table.MetaColumns.Where(c => c.Name == item.ColumnName).ToList();
+            foreach (var col in matchingCols)
+            {
+                // Grid görünürlüğü
+                if (item.IsVisibleInGrid)
+                {
+                    if (col.TypeName != nameof(SelectedColumn))
+                        col.TypeName = nameof(SelectedColumn);
+                }
+                else
+                {
+                    // Seçili olmaktan çıkar
+                    if (col.TypeName == nameof(SelectedColumn))
+                        col.TypeName = nameof(MetaColumn);
+                }
+
+                // Filtre barı görünürlüğü
+                if (col.FilterDTO != null)
+                {
+                    col.FilterDTO.CreateFilterComponentFromThis = item.IsVisibleInFilterBar;
+                }
+            }
+        }
+
+        // Değişiklikleri bildir
+        await TableChanged.InvokeAsync(Table);
+
+        // Preference JSON üretip bildir
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            visibleColumns = _items.Where(i => i.IsVisibleInGrid).Select(i => i.ColumnName).ToList(),
+            filterColumns = _items.Where(i => i.IsVisibleInFilterBar).Select(i => i.ColumnName).ToList()
+        });
+
+        if (OnPreferenceSaved.HasDelegate)
+            await OnPreferenceSaved.InvokeAsync(json);
+
+        await Close();
+    }
+
+    private void ResetToDefaults()
+    {
+        OnParametersSet();
+    }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

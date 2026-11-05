@@ -1,4 +1,7 @@
 @typeparam T where T : class
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Hydra.AccessManagement.Authorization
 @using Hydra.RazorClassLibrary.Services.Core
 @using Hydra.DTOs
 @using Hydra.RazorClassLibrary.Components.Grids
@@ -35,7 +38,7 @@ else
                         <span>Filters</span>
                     </button>
                 }
-                @if (ShowCreateButton)
+                @if (ShowCreateButton && CanCreate)
                 {
                     <button type="button" class="hydra-btn hydra-btn--create" @onclick="GoToCreate">
                         <i class="hydra-icon bi bi-plus-lg"></i>
@@ -60,14 +63,20 @@ else
                     }
                     else
                     {
-                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--edit" title="Edit"
-                                @onclick="() => GoToUpdate(row.Id)">
-                            <i class="hydra-icon bi bi-pencil"></i>
-                        </button>
-                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--delete" title="Delete"
-                                @onclick="() => AskDelete(row.Id)">
-                            <i class="hydra-icon bi bi-trash"></i>
-                        </button>
+                        @if (CanUpdate)
+                        {
+                            <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--edit" title="Edit"
+                                    @onclick="() => GoToUpdate(row.Id)">
+                                <i class="hydra-icon bi bi-pencil"></i>
+                            </button>
+                        }
+                        @if (CanDelete)
+                        {
+                            <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--delete" title="Delete"
+                                    @onclick="() => AskDelete(row.Id)">
+                                <i class="hydra-icon bi bi-trash"></i>
+                            </button>
+                        }
                     }
                 </ChildContent>
             </HydraGrid>
@@ -99,6 +108,24 @@ else
     // Optional: Override default navigation paths
     [Parameter] public string? BasePath { get; set; }
 
+    /// <summary>
+    /// Academy 5.5, layer 4 (ComponentBased): action buttons follow the caller's permissions.
+    ///
+    /// A "Delete" button that always answers 403 is worse than no button — it teaches people the
+    /// app is broken. These checks read the SAME endpoint claims the server checks, so what is
+    /// visible and what is allowed cannot drift apart. It hides buttons, it does not protect data:
+    /// PermissionAuthorizationFilter re-checks every call regardless of what the UI rendered.
+    /// </summary>
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private ClaimsPrincipal? CurrentUser;
+
+    private string ControllerName => BasePath ?? Client.Controller ?? typeof(T).Name;
+
+    private bool CanCreate => CurrentUser.CanAccessEndpoint(ControllerName, "Create");
+    private bool CanUpdate => CurrentUser.CanAccessEndpoint(ControllerName, "Update");
+    private bool CanDelete => CurrentUser.CanAccessEndpoint(ControllerName, "Delete");
+
     private TableDTO? Table { get; set; }
     private bool IsLoading = true;
     private bool ShowFilters;
@@ -110,6 +137,9 @@ else
         Title ??= $"{typeof(T).Name} List";
         BasePath ??= Client.Controller;
         ShowFilters = ShowFiltersInitially;
+
+        if (AuthenticationStateTask is not null)
+            CurrentUser = (await AuthenticationStateTask).User;
 
         await LoadDataAsync();
     }

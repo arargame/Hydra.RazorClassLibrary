@@ -97,6 +97,32 @@ namespace Hydra.RazorClassLibrary.Services.Core
             );
         }
 
+        /// <summary>
+        /// Çoka-çok ilişkide toplu bağ kurar: köprü tabloya, seçilen her sağ-taraf kaydı için bir
+        /// satır açar. Zaten bağlı olanlar sunucuda atlanır, mükerrer satır oluşmaz.
+        /// </summary>
+        public async Task<Hydra.Http.ResponseObject?> LinkToCollectionAsync(Hydra.DTOs.CollectionLinkDTO dto)
+        {
+            return await Http.PostEnvelopeAsync<Hydra.Http.ResponseObject>(
+                controller: Controller,
+                action: "LinkToCollection",
+                payload: dto
+            );
+        }
+
+        /// <summary>
+        /// Bağı koparır. Verilen Id'ler SAĞ tarafın (ör. Permission) Id'leridir; silinecek köprü
+        /// satırlarını sunucu kendisi bulur, istemcinin ayrıca sorgu atmasına gerek yoktur.
+        /// </summary>
+        public async Task<Hydra.Http.ResponseObject?> UnlinkFromCollectionAsync(Hydra.DTOs.CollectionLinkDTO dto)
+        {
+            return await Http.PostEnvelopeAsync<Hydra.Http.ResponseObject>(
+                controller: Controller,
+                action: "UnlinkFromCollection",
+                payload: dto
+            );
+        }
+
         public async Task<Hydra.DTOs.TableDTO?> GetCreateViewAsync()
         {
             var request = new Hydra.DTOs.TableDTO 

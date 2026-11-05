@@ -1,0 +1,225 @@
+@using Hydra.DTOs
+@using Hydra.RazorClassLibrary.ComponentModels
+@using Hydra.RazorClassLibrary.Services.Core
+@inject LookupService Lookup
+
+@* Çoklu seçim lookup modalı — LookupModalComponent'in "birden fazla kayıt seç" hâli.
+
+   Tek seçimli kardeşi FK alanları içindir (bir kategori seç). Bu ise çoka-çok bağlamak içindir:
+   bir role on izni tek tek form doldurarak değil, listeden işaretleyip tek seferde bağlamak.
+
+   Arama kutusu ve "hepsini seç" seçimi KORUR: filtre değiştirince önceki işaretler kaybolmaz,
+   çünkü seçim bir HashSet'te tutulur, ekranda görünen satırlarda değil. (GedenLines'ın aynı
+   yerdeki kodu bozuktu — hesaplanan bir listeyi Clear/Add ediyor, hiçbir etkisi olmuyordu.) *@
+
+@if (IsOpen)
+{
+    <div class="hydra-modal-backdrop" @onclick="Cancel">
+        <div class="hydra-modal hydra-modal--primary hydra-lookup" @onclick:stopPropagation="true">
+
+            <div class="hydra-modal__header">
+                <h2 class="hydra-modal__title">@Title</h2>
+                <button type="button" class="hydra-modal__close" title="Close" @onclick="Cancel">
+                    <i class="hydra-icon bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="hydra-lookup__search-bar">
+                <div class="hydra-lookup__search">
+                    <i class="hydra-icon bi bi-search hydra-lookup__search-icon"></i>
+                    <input class="hydra-input hydra-lookup__search-input" type="search" placeholder="@SearchPlaceholder"
+                           value="@_searchText" @oninput="e => _searchText = e.Value?.ToString() ?? string.Empty" />
+                </div>
+            </div>
+
+            <div class="hydra-lookup__toolbar">
+                <label class="hydra-lookup__select-all">
+                    <input type="checkbox" checked="@AllVisibleSelected" @onchange="ToggleAllVisible" />
+                    <span>Select all @(string.IsNullOrWhiteSpace(_searchText) ? "" : "matching") (@FilteredOptions.Count)</span>
+                </label>
+
+                <span class="hydra-lookup__count">@_selected.Count selected</span>
+            </div>
+
+            <div class="hydra-lookup__list-wrap">
+                @if (IsLoading)
+                {
+                    <SpinnerComponent />
+                }
+                else if (FilteredOptions.Count == 0)
+                {
+                    <div class="hydra-lookup__empty">No matching records.</div>
+                }
+                else
+                {
+                    <ul class="hydra-lookup__list">
+                        @foreach (var option in FilteredOptions)
+                        {
+                            var key = option.Key;
+                            var isSelected = _selected.Contains(key);
+
+                            <li class="hydra-lookup__item @(isSelected ? "hydra-lookup__item--selected" : "")"
+                                @onclick="() => Toggle(key)">
+                                <input type="checkbox" checked="@isSelected" @onclick:stopPropagation="true" @onchange="() => Toggle(key)" />
+                                <span class="hydra-lookup__item-label">@option.Value</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+
+            <div class="hydra-modal__footer">
+                <button type="button" class="hydra-btn hydra-btn--secondary" @onclick="Cancel">Cancel</button>
+                <button type="button" class="hydra-btn hydra-modal__confirm"
+                        disabled="@(_selected.Count == 0 || IsBusy)"
+                        @onclick="Confirm">
+                    @(IsBusy ? "Linking..." : $"Link {_selected.Count} record(s)")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .hydra-lookup__toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 12px;
+        font-size: 13px;
+        opacity: .85;
+    }
+
+    .hydra-lookup__select-all {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .hydra-lookup__list .hydra-lookup__item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Select Records";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search...";
+
+    /// <summary>Doğrudan verilen seçenekler; verilmezse Navigation üzerinden yüklenir.</summary>
+    [Parameter] public List<DropdownListOption>? Options { get; set; }
+
+    /// <summary>Seçenekleri LookupService ile yüklemek için FK bilgisi.</summary>
+    [Parameter] public NavigationColumnInfoDTO? Navigation { get; set; }
+
+    /// <summary>Zaten bağlı olan Id'ler — listede işaretli ve devre dışı gelmez, sadece ön-işaretli gelmez.</summary>
+    [Parameter] public IReadOnlyCollection<Guid>? AlreadyLinkedIds { get; set; }
+
+    /// <summary>Onaylandığında seçilen Id'leri verir.</summary>
+    [Parameter] public EventCallback<List<Guid>> OnConfirmed { get; set; }
+
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    /// <summary>Bağlama işlemi sürerken butonu kilitlemek için dışarıdan set edilir.</summary>
+    [Parameter] public bool IsBusy { get; set; }
+
+    private string _searchText = string.Empty;
+    private bool IsLoading;
+    private bool _loadedOnce;
+    private List<DropdownListOption> _loadedOptions = new();
+
+    //Seçim, ekranda görünen satırlardan bağımsız tutuluyor: arama yazıp listeyi daraltmak
+    //önceki işaretleri silmemeli.
+    private readonly HashSet<string> _selected = new();
+
+    private List<DropdownListOption> FilteredOptions
+    {
+        get
+        {
+            var source = Options ?? _loadedOptions;
+
+            if (string.IsNullOrWhiteSpace(_searchText))
+                return source;
+
+            var term = _searchText.Trim();
+
+            return source.Where(o => o.Value?.Contains(term, StringComparison.OrdinalIgnoreCase) == true).ToList();
+        }
+    }
+
+    private bool AllVisibleSelected => FilteredOptions.Count > 0 && FilteredOptions.All(o => _selected.Contains(o.Key));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && Options == null && Navigation != null && !_loadedOnce)
+        {
+            IsLoading = true;
+            _loadedOnce = true;
+
+            try
+            {
+                _loadedOptions = await Lookup.GetNavigationOptionsAsync(Navigation, addEmptyOption: false);
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+    }
+
+    private void Toggle(string key)
+    {
+        if (!_selected.Add(key))
+            _selected.Remove(key);
+    }
+
+    private void ToggleAllVisible()
+    {
+        if (AllVisibleSelected)
+        {
+            foreach (var option in FilteredOptions)
+                _selected.Remove(option.Key);
+        }
+        else
+        {
+            foreach (var option in FilteredOptions)
+                _selected.Add(option.Key);
+        }
+    }
+
+    private async Task Confirm()
+    {
+        var ids = _selected
+            .Select(key => Guid.TryParse(key, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .ToList();
+
+        if (ids.Count == 0)
+            return;
+
+        await OnConfirmed.InvokeAsync(ids);
+    }
+
+    /// <summary>Bağlama bittikten sonra dışarıdan çağrılır: seçim temizlenir, modal kapanır.</summary>
+    public async Task CloseAndResetAsync()
+    {
+        _selected.Clear();
+        _searchText = string.Empty;
+
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task Cancel()
+    {
+        await CloseAndResetAsync();
+        await OnCancel.InvokeAsync();
+    }
+}

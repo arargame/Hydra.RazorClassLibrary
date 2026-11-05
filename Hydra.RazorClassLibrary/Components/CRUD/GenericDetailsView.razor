@@ -55,31 +55,29 @@ else
             </div>
         </header>
 
-        <section class="hydra-details__summary">
-            <div class="hydra-details__summary-header">
-                <h2 class="hydra-details__summary-title">Key Information</h2>
-            </div>
-            <div class="hydra-details__summary-body">
-                @foreach (var column in DisplayColumns)
-                {
-                    <div class="hydra-details__pair">
-                        <span class="hydra-details__pair-label">@column.DisplayName</span>
-                        <span class="hydra-details__pair-value">
-                            @if (IsNavigationLink(column))
-                            {
-                                <a class="hydra-details__link" href="@GetNavigationLink(column)">@GetValue(column)</a>
-                            }
-                            else
-                            {
-                                @GetValue(column)
-                            }
-                        </span>
-                    </div>
-                }
-            </div>
-        </section>
+        <div class="hydra-details__body">
+            @if (DisplayColumns.Any())
+            {
+                <div class="hydra-details__summary-body">
+                    @foreach (var column in DisplayColumns)
+                    {
+                        <div class="hydra-details__pair">
+                            <span class="hydra-details__pair-label">@column.DisplayName</span>
+                            <span class="hydra-details__pair-value">
+                                @if (IsNavigationLink(column))
+                                {
+                                    <a class="hydra-details__link" href="@GetNavigationLink(column)">@GetValue(column)</a>
+                                }
+                                else
+                                {
+                                    @GetValue(column)
+                                }
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
 
-        <section class="hydra-details__tabs-card">
             <CascadingValue Value="(IDetailsTabsHost)this" IsFixed="true">
 
                 @* Sekme şeridi. Sekmeler, alttaki panellerin OnInitialized'ında kaydolur;
@@ -126,7 +124,7 @@ else
                     }
                 </div>
             </CascadingValue>
-        </section>
+        </div>
     </div>
 
     <ConfirmDialogComponent @bind-IsOpen="ShowDeleteConfirm"

@@ -26,13 +26,22 @@
             }
             @Title
         </h3>
-        @if (ShowCreateButton)
-        {
-            <a class="hydra-btn hydra-btn--add" href="@CreateLink">
-                <i class="hydra-icon bi bi-plus-lg"></i>
-                <span>Add</span>
-            </a>
-        }
+        <div class="hydra-collection__actions">
+            @if (IsCrossTable)
+            {
+                <button type="button" class="hydra-btn hydra-btn--add" @onclick="OpenLinkModal">
+                    <i class="hydra-icon bi bi-link-45deg"></i>
+                    <span>Link</span>
+                </button>
+            }
+            else if (ShowCreateButton)
+            {
+                <a class="hydra-btn hydra-btn--add" href="@CreateLink">
+                    <i class="hydra-icon bi bi-plus-lg"></i>
+                    <span>Add</span>
+                </a>
+            }
+        </div>
     </div>
 
     <div class="hydra-collection__body">
@@ -54,13 +63,33 @@
         }
         else
         {
-            <HydraGrid Table="@Table" TableChanged="OnTableChanged" HasActions="false"
+            <HydraGrid Table="@Table" TableChanged="OnTableChanged" HasActions="@IsCrossTable"
                        ShowPageSizeSelector="false" ShowSearchBox="false"
                        ShowDetailsColumnIfBound="@ShowDetailsColumn"
-                       DetailsClicked="@(id => Navigation.NavigateTo($"/{RoutePath}/Details/{id}"))" />
+                       DetailsClicked="@(id => Navigation.NavigateTo($"/{RoutePath}/Details/{id}"))">
+                <ChildContent Context="row">
+                    @if (IsCrossTable)
+                    {
+                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--delete" title="Unlink"
+                                @onclick="() => UnlinkRow(row)">
+                            <i class="hydra-icon bi bi-x-lg"></i>
+                        </button>
+                    }
+                </ChildContent>
+            </HydraGrid>
         }
     </div>
 </div>
+
+@if (IsCrossTable)
+{
+    <MultiSelectLookupModal @ref="LinkModal"
+                            @bind-IsOpen="ShowLinkModal"
+                            Title="@($"Link {RightTableName}")"
+                            Navigation="@LookupNavigation"
+                            IsBusy="@IsLinking"
+                            OnConfirmed="LinkSelected" />
+}
 
 @code {
     [Inject] public IHttpClientService Http { get; set; } = default!;
@@ -72,6 +101,93 @@
 
     /// <summary>Alt kayıtların controller adı (ör. "Request").</summary>
     [Parameter, EditorRequired] public string Controller { get; set; } = default!;
+
+    // ------------------------------------------------------------------------------------
+    // Çoka-çok (cross table) modu.
+    //
+    // RightKeyName + RightTableName verilirse bu bölüm köprü tablo olarak davranır: "Add"
+    // yerine "Link" butonu çıkar, satırlara "Unlink" gelir. Verilmezse hiçbir şey değişmez —
+    // bire-çok kullanımları (ör. Kategori → Talepler) aynen eski davranışta kalır.
+    //
+    // Controller ve ForeignKeyName zaten sol tarafı tarif ediyor (ör. "RolePermission" +
+    // "RoleId"); cross-table modu için eksik olan tek şey sağ taraf.
+    // ------------------------------------------------------------------------------------
+
+    /// <summary>Köprüdeki sağ taraf FK alanı, ör. "PermissionId". Verilirse cross-table modu açılır.</summary>
+    [Parameter] public string? RightKeyName { get; set; }
+
+    /// <summary>Sağ tarafın entity adı, ör. "Permission" — lookup listesi bundan doldurulur.</summary>
+    [Parameter] public string? RightTableName { get; set; }
+
+    /// <summary>Lookup listesinde gösterilecek kolon, ör. "Name" ya da "Email".</summary>
+    [Parameter] public string RightDisplayColumn { get; set; } = "Name";
+
+    private bool IsCrossTable => !string.IsNullOrWhiteSpace(RightKeyName) && !string.IsNullOrWhiteSpace(RightTableName);
+
+    private MultiSelectLookupModal? LinkModal;
+    private bool ShowLinkModal;
+    private bool IsLinking;
+
+    private NavigationColumnInfoDTO LookupNavigation => new()
+    {
+        LeftTableName = Controller,
+        LeftTableKeyName = RightKeyName ?? string.Empty,
+        RightTableName = RightTableName ?? string.Empty,
+        RightTableKeyName = "Id",
+        NameToDisplay = RightDisplayColumn
+    };
+
+    private CollectionLinkDTO BuildLinkDTO(List<Guid> rightIds) => new()
+    {
+        CrossTableName = Controller,
+        LeftKeyName = ForeignKeyName,
+        LeftKeyValue = ParentId,
+        RightKeyName = RightKeyName,
+        RightIds = rightIds
+    };
+
+    private void OpenLinkModal() => ShowLinkModal = true;
+
+    private async Task LinkSelected(List<Guid> rightIds)
+    {
+        if (rightIds.Count == 0)
+            return;
+
+        IsLinking = true;
+
+        try
+        {
+            await Http.PostEnvelopeAsync<object>(controller: Controller, action: "LinkToCollection", payload: BuildLinkDTO(rightIds));
+
+            if (LinkModal is not null)
+                await LinkModal.CloseAndResetAsync();
+
+            //GedenLines burada tam sayfa reload yapıyordu (forceLoad: true) — Blazor Server'da
+            //bu, SignalR circuit'ini koparıp bütün sayfayı yeniden kurmak demek. Sadece bu
+            //bölümün verisini tazelemek yeterli.
+            await ReloadAsync();
+        }
+        finally
+        {
+            IsLinking = false;
+        }
+    }
+
+    private async Task UnlinkRow(RowDTO row)
+    {
+        if (!IsCrossTable)
+            return;
+
+        //Köprü satırındaki sağ taraf Id'si: sunucu bundan silinecek köprü kaydını kendisi bulur.
+        var rightId = row.GetValueByColumnName(RightKeyName!);
+
+        if (rightId is null || !Guid.TryParse(rightId.ToString(), out var id) || id == Guid.Empty)
+            return;
+
+        await Http.PostEnvelopeAsync<object>(controller: Controller, action: "UnlinkFromCollection", payload: BuildLinkDTO(new List<Guid> { id }));
+
+        await ReloadAsync();
+    }
 
     /// <summary>Alt tablodaki filtre kolonu (ör. "RequestCategoryId", Log için "EntityId").</summary>
     [Parameter, EditorRequired] public string ForeignKeyName { get; set; } = default!;
@@ -119,6 +235,21 @@
         TabsHost?.RegisterTab(this, Title);
 
         await LoadAsync();
+    }
+
+    /// <summary>
+    /// Bu bölümün verisini yeniden yükler. Link/Unlink sonrası çağrılır; dışarıdan da
+    /// çağrılabilsin diye public — sayfayı baştan yüklemeye gerek kalmadan tazelemek için.
+    /// </summary>
+    public async Task ReloadAsync()
+    {
+        //Table null'lanıyor ki sayfalama/filtre state'i değil, temiz bir istek gitsin:
+        //bağ kurulduktan sonra kullanıcı listenin başını görmeli.
+        Table = null;
+
+        await LoadAsync();
+
+        StateHasChanged();
     }
 
     private async Task LoadAsync()

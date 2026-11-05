@@ -9,7 +9,7 @@ namespace Hydra.RazorClassLibrary.ComponentModels
         public IEnumerable<TItem>? Items { get; set; }
 
         [Parameter]
-        public RenderFragment<TItem>? ChildContent { get; set; }
+        public new RenderFragment<TItem>? ChildContent { get; set; }
 
         [Parameter] // Columns header definition if needed, or derived from TItem reflection
         public RenderFragment? HeaderContent { get; set; }

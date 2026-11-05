@@ -12,7 +12,7 @@
         <div class="hydra-filterbar__grid">
             @foreach (var column in FilterColumns)
             {
-                <div class="hydra-filterbar__field">
+                <div class="hydra-filterbar__field @(IsBetweenFilter(column) ? "hydra-filterbar__field--range" : "")">
                     <label class="hydra-filterbar__label">@column.DisplayName</label>
 
                     @if (IsBetweenFilter(column))

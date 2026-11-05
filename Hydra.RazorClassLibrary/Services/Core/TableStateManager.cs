@@ -125,55 +125,9 @@ namespace Hydra.RazorClassLibrary.Services.Core
             request.PageNumber = state.PageNumber;
             request.PageSize = state.PageSize;
 
-            if (state.Filters != null && state.Filters.Any())
+            if (request.MetaColumns != null && request.MetaColumns.Any())
             {
-                foreach (var filterState in state.Filters)
-                {
-                    var existing = request.MetaColumns?.FirstOrDefault(c => c.Name == filterState.ColumnName);
-                    if (existing?.FilterDTO != null)
-                    {
-                        existing.FilterDTO.SetParameters(filterState.Values.Cast<object?>().ToList());
-                    }
-                    else
-                    {
-                        // Request henüz boş MetaColumns listesine sahipse, dinamik filter DTO ekle
-                        if (filterState.Values.Count == 1 && !string.IsNullOrEmpty(filterState.Values[0]))
-                        {
-                            var filterCol = MetaColumnDTO.CreateColumnDTOWithContainsFilter(
-                                name: filterState.ColumnName,
-                                alias: null,
-                                value: filterState.Values[0]!
-                            );
-                            filterCol.TableName = filterState.TableName;
-                            request.AlterOrAddMetaColumn(filterCol);
-                        }
-                        else if (filterState.Values.Count >= 2 && !string.IsNullOrEmpty(filterState.Values[0]) && !string.IsNullOrEmpty(filterState.Values[1]))
-                        {
-                            var filterCol = MetaColumnDTO.CreateColumnDTOWithFilter(
-                                name: filterState.ColumnName,
-                                alias: null,
-                                priority: 0,
-                                filterTypeName: nameof(BetweenFilter),
-                                filterPriority: 0,
-                                createFilterComponentFromThis: true,
-                                values: filterState.Values.Cast<object?>().ToList()
-                            );
-                            filterCol.TableName = filterState.TableName;
-                            request.AlterOrAddMetaColumn(filterCol);
-                        }
-                    }
-                }
-            }
-
-            // Sıralama
-            if (!string.IsNullOrWhiteSpace(state.OrderedColumnName) && state.SortingDirection.HasValue)
-            {
-                var orderCol = MetaColumnDTO.CreateColumnDTOToOrder(
-                    name: state.OrderedColumnName,
-                    alias: null,
-                    sortingDirection: state.SortingDirection.Value
-                );
-                request.AlterOrAddMetaColumn(orderCol);
+                ApplyStateToTable(request, state);
             }
         }
 

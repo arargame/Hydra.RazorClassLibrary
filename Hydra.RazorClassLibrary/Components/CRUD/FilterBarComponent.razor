@@ -94,35 +94,34 @@
                     parameters?.ElementAtOrDefault(1)?.Value?.ToString()
                 };
             }
-            else if (!_rawValues.ContainsKey(key))
+            else
             {
                 _rawValues[key] = new string?[2];
             }
 
-            if (!_optionsByField.ContainsKey(key))
+            if (column.ValueType == ColumnValueType.Enum)
             {
-                List<DropdownListOption>? options = null;
-
-                if (column.ValueType == ColumnValueType.Enum)
+                _optionsByField[key] = Lookup.GetEnumOptions(column.PropertyTypeName, addEmptyOption: true);
+            }
+            else if (column.ValueType == ColumnValueType.Boolean)
+            {
+                _optionsByField[key] = new List<DropdownListOption>
                 {
-                    options = Lookup.GetEnumOptions(column.PropertyTypeName, addEmptyOption: true);
-                }
-                else if (column.ValueType == ColumnValueType.Boolean)
+                    new DropdownListOption(string.Empty, "— All —"),
+                    new DropdownListOption("1", "Yes"),
+                    new DropdownListOption("0", "No")
+                };
+            }
+            else if (column.IsForeignKey && column.NavigationColumnInfoDTO != null)
+            {
+                if (!_optionsByField.ContainsKey(key))
                 {
-                    options = new List<DropdownListOption>
-                    {
-                        new DropdownListOption(string.Empty, "— All —"),
-                        new DropdownListOption("1", "Yes"),
-                        new DropdownListOption("0", "No")
-                    };
+                    _optionsByField[key] = await Lookup.GetNavigationOptionsAsync(column.NavigationColumnInfoDTO, addEmptyOption: true);
                 }
-                else if (column.IsForeignKey && column.NavigationColumnInfoDTO != null)
-                {
-                    options = await Lookup.GetNavigationOptionsAsync(column.NavigationColumnInfoDTO, addEmptyOption: true);
-                }
-
-                if (options != null)
-                    _optionsByField[key] = options;
+            }
+            else
+            {
+                _optionsByField.Remove(key);
             }
         }
     }

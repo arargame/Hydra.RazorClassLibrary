@@ -170,26 +170,29 @@ else
             var isInitial = Table == null;
             var request = Table ?? new TableDTO { Name = Client.Controller, ViewType = Hydra.DTOs.ViewDTOs.ViewType.ListView };
 
-            ViewPreferenceState? savedState = null;
-            if (isInitial)
+            // 1. Backend'den tam metadata ve doğru tiplere (String, Boolean, DateTime) sahip TableDTO'yu al
+            Table = await Client.SelectAsync(request);
+
+            // 2. İlk açılışta saklanan kullanıcı tercihini / filtre state'ini yükle
+            if (isInitial && Table != null)
             {
-                savedState = await StateManager.GetStateAsync(Client.Controller);
+                var savedState = await StateManager.GetStateAsync(Client.Controller);
                 if (savedState != null)
                 {
-                    StateManager.ApplyStateToRequest(request, savedState);
+                    // Saklanan filtreleri ve sıralamayı orijinal tipleri bozmadan Table'a bağla
+                    StateManager.ApplyStateToTable(Table, savedState);
 
                     if (savedState.Filters.Any())
                     {
                         ShowFilters = true;
+
+                        // Filtreli veriyi çekmek için backend'e tam TableDTO ile sorgu gönder
+                        Table = await Client.SelectAsync(Table);
+
+                        // Dönen tabloya filtre parametrelerini tekrar bağla (FilterBar ve DevExpress paneli için)
+                        StateManager.ApplyStateToTable(Table, savedState);
                     }
                 }
-            }
-
-            Table = await Client.SelectAsync(request);
-
-            if (isInitial && savedState != null && Table != null)
-            {
-                StateManager.ApplyStateToTable(Table, savedState);
             }
         }
         finally

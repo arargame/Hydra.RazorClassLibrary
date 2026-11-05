@@ -18,18 +18,18 @@
                     @if (IsBetweenFilter(column))
                     {
                         <div class="hydra-filterbar__range">
-                            <input class="hydra-input" type="date"
+                            <input class="hydra-input hydra-input--sm form-control-sm" type="date"
                                    value="@GetRawValue(column, 0)"
                                    @onchange="e => SetRawValue(column, 0, e.Value)" />
                             <span class="hydra-filterbar__range-sep">–</span>
-                            <input class="hydra-input" type="date"
+                            <input class="hydra-input hydra-input--sm form-control-sm" type="date"
                                    value="@GetRawValue(column, 1)"
                                    @onchange="e => SetRawValue(column, 1, e.Value)" />
                         </div>
                     }
                     else if (GetOptions(column) is { } options)
                     {
-                        <select class="hydra-select"
+                        <select class="hydra-select hydra-select--sm form-select-sm"
                                 @onchange="e => SetRawValue(column, 0, e.Value)">
                             @foreach (var option in options)
                             {
@@ -39,7 +39,7 @@
                     }
                     else
                     {
-                        <input class="hydra-input"
+                        <input class="hydra-input hydra-input--sm form-control-sm"
                                type="@GetInputType(column)"
                                placeholder="@column.DisplayName"
                                value="@GetRawValue(column, 0)"
@@ -51,11 +51,11 @@
         </div>
 
         <div class="hydra-filterbar__actions">
-            <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="ClearFilters">
+            <button type="button" class="hydra-btn hydra-btn--sm hydra-btn--ghost" @onclick="ClearFilters">
                 <i class="hydra-icon bi bi-x-lg"></i>
                 <span>Clear</span>
             </button>
-            <button type="button" class="hydra-btn hydra-btn--primary" @onclick="ApplyFilters">
+            <button type="button" class="hydra-btn hydra-btn--sm hydra-btn--primary" @onclick="ApplyFilters">
                 <i class="hydra-icon bi bi-funnel"></i>
                 <span>Apply</span>
             </button>

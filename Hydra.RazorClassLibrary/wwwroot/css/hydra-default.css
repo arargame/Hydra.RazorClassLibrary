@@ -1058,3 +1058,26 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
 }
+
+.hydra-grid__row--empty:hover {
+    background: transparent !important;
+}
+
+.hydra-grid__cell--empty {
+    text-align: center;
+    padding: 3rem 1rem !important;
+}
+
+.hydra-grid__empty-row {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+    color: var(--hydra-text-muted);
+}
+
+.hydra-grid__empty-row .hydra-icon {
+    font-size: 1.125rem;
+    opacity: 0.75;
+}

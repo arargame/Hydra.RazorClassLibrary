@@ -16,13 +16,6 @@
 {
     <SpinnerComponent />
 }
-else if (Table.Rows == null || Table.Rows.Count == 0)
-{
-    <div class="hydra-grid__empty">
-        <i class="hydra-icon bi bi-info-circle"></i>
-        <span>No records found.</span>
-    </div>
-}
 else
 {
     <div class="hydra-grid">
@@ -46,23 +39,14 @@ else
             </div>
         }
 
-        @if (FilteredRows.Count == 0)
-        {
-            <div class="hydra-grid__empty hydra-grid__empty--search">
-                <i class="hydra-icon bi bi-search"></i>
-                <span>No records match your search.</span>
-            </div>
-        }
-        else
-        {
-            <div class="hydra-grid__scroll">
-                <table class="hydra-grid__table">
-                    <thead class="hydra-grid__head">
-                        <tr class="hydra-grid__head-row">
-                            @if (ShowDetailsColumn)
-                            {
-                                <th scope="col" class="hydra-grid__th hydra-grid__th--details"></th>
-                            }
+        <div class="hydra-grid__scroll">
+            <table class="hydra-grid__table">
+                <thead class="hydra-grid__head">
+                    <tr class="hydra-grid__head-row">
+                        @if (ShowDetailsColumn)
+                        {
+                            <th scope="col" class="hydra-grid__th hydra-grid__th--details"></th>
+                        }
                             @foreach (var column in VisibleColumns)
                             {
                                 <th scope="col"
@@ -99,37 +83,50 @@ else
                         </tr>
                     </thead>
                     <tbody class="hydra-grid__body">
-                        @foreach (var row in FilteredRows)
+                        @if (FilteredRows.Count == 0)
                         {
-                            <tr class="hydra-grid__row">
-                                @if (ShowDetailsColumn)
-                                {
-                                    <td class="hydra-grid__cell hydra-grid__cell--details">
-                                        <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--details" title="Details"
-                                                @onclick="() => DetailsClicked.InvokeAsync(row.Id)">
-                                            <i class="hydra-icon bi bi-eye"></i>
-                                        </button>
-                                    </td>
-                                }
-                                @foreach (var column in VisibleColumns)
-                                {
-                                    <td class="hydra-grid__cell">
-                                        @CellText(row, column)
-                                    </td>
-                                }
-
-                                @if (HasActions)
-                                {
-                                    <td class="hydra-grid__cell hydra-grid__cell--actions">
-                                        @ChildContent?.Invoke(row)
-                                    </td>
-                                }
+                            <tr class="hydra-grid__row hydra-grid__row--empty">
+                                <td colspan="@TotalColumnCount" class="hydra-grid__cell hydra-grid__cell--empty">
+                                    <div class="hydra-grid__empty-row">
+                                        <i class="hydra-icon bi bi-info-circle"></i>
+                                        <span>No records found.</span>
+                                    </div>
+                                </td>
                             </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in FilteredRows)
+                            {
+                                <tr class="hydra-grid__row">
+                                    @if (ShowDetailsColumn)
+                                    {
+                                        <td class="hydra-grid__cell hydra-grid__cell--details">
+                                            <button type="button" class="hydra-btn hydra-btn--icon hydra-btn--details" title="Details"
+                                                    @onclick="() => DetailsClicked.InvokeAsync(row.Id)">
+                                                <i class="hydra-icon bi bi-eye"></i>
+                                            </button>
+                                        </td>
+                                    }
+                                    @foreach (var column in VisibleColumns)
+                                    {
+                                        <td class="hydra-grid__cell">
+                                            @CellText(row, column)
+                                        </td>
+                                    }
+
+                                    @if (HasActions)
+                                    {
+                                        <td class="hydra-grid__cell hydra-grid__cell--actions">
+                                            @ChildContent?.Invoke(row)
+                                        </td>
+                                    }
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
             </div>
-        }
 
         @if (ActiveFilterFragments.Any())
         {
@@ -212,13 +209,24 @@ else
                .OrderBy(c => c.Priority)
                .ToList();
 
+    private int TotalColumnCount
+    {
+        get
+        {
+            int count = VisibleColumns.Count;
+            if (ShowDetailsColumn) count++;
+            if (HasActions) count++;
+            return Math.Max(count, 1);
+        }
+    }
+
     /// <summary>Arama kutusuna yazılan metne göre (mevcut sayfadaki) satırları süzer.
     /// Görünen tüm kolonların metin karşılığında case-insensitive "içerir" araması yapar.</summary>
     private List<RowDTO> FilteredRows
     {
         get
         {
-            if (Table?.Rows == null)
+            if (Table?.Rows == null || Table.Rows.Count == 0)
                 return new List<RowDTO>();
 
             if (string.IsNullOrWhiteSpace(_searchText))

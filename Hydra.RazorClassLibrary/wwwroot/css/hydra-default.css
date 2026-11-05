@@ -1,4 +1,4 @@
-/* ============================================================================
+﻿/* ============================================================================
    Hydra RazorClassLibrary — VARSAYILAN (nötr) tema
    ----------------------------------------------------------------------------
    Bu dosya, RCL bileşenlerinin (HydraGrid, GenericListView, FilterBar,
@@ -294,6 +294,7 @@
     font-size: 0.75rem;
     color: var(--hydra-text-muted);
     white-space: nowrap;
+    margin-left: auto;
 }
 
 .hydra-grid__scroll { overflow-x: auto; }
@@ -321,7 +322,31 @@
 .hydra-grid__th--details { width: 1%; }
 .hydra-grid__th--actions { text-align: right; }
 
-.hydra-grid__sort-icon { margin-left: 0.25rem; font-size: 0.75rem; }
+.hydra-grid__th-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.hydra-grid__sort-icon {
+    font-size: 0.8125rem;
+    transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.hydra-grid__sort-icon--neutral {
+    opacity: 0.35;
+    color: var(--hydra-text-muted);
+}
+
+.hydra-grid__th--sortable:hover .hydra-grid__sort-icon--neutral {
+    opacity: 0.85;
+    color: var(--hydra-text);
+}
+
+.hydra-grid__sort-icon--active {
+    opacity: 1;
+    color: var(--hydra-primary);
+}
 
 .hydra-grid__row { border-bottom: 1px solid var(--hydra-border); }
 .hydra-grid__row:hover { background: var(--hydra-bg-hover); }
@@ -1010,4 +1035,26 @@
 .hydra-grid__active-filter-clear:hover {
     color: #ef4444;
     background: rgba(239, 68, 68, 0.12);
+}
+
+
+/* ------------------------------------------------------------- Scrollbar */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 9999px;
+    transition: background 0.15s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.5);
+}
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
 }

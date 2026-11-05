@@ -68,12 +68,28 @@ else
                                 <th scope="col"
                                     class="hydra-grid__th @(column.IsOrderable ? "hydra-grid__th--sortable" : "")"
                                     @onclick="() => OnSort(column)">
-                                    @column.DisplayName
-                                    @{ var sortState = GetSortState(column); }
-                                    @if (sortState != null)
-                                    {
-                                        <i class="hydra-icon hydra-grid__sort-icon bi @(sortState.Direction == Hydra.DataModels.SortingDirection.Ascending ? "bi-caret-up-fill" : "bi-caret-down-fill")"></i>
-                                    }
+                                    <span class="hydra-grid__th-content">
+                                        <span class="hydra-grid__th-label">@column.DisplayName</span>
+                                        @if (column.IsOrderable)
+                                        {
+                                            var sortState = GetSortState(column);
+                                            if (sortState != null && sortState.IsOrdered)
+                                            {
+                                                if (sortState.Direction == Hydra.DataModels.SortingDirection.Ascending)
+                                                {
+                                                    <i class="hydra-icon hydra-grid__sort-icon hydra-grid__sort-icon--active bi bi-sort-alpha-down" title="Sorted Ascending (click for Descending)"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="hydra-icon hydra-grid__sort-icon hydra-grid__sort-icon--active bi bi-sort-alpha-up-alt" title="Sorted Descending (click to clear sorting)"></i>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <i class="hydra-icon hydra-grid__sort-icon hydra-grid__sort-icon--neutral bi bi-arrow-down-up" title="Click to sort"></i>
+                                            }
+                                        }
+                                    </span>
                                 </th>
                             }
                             @if (HasActions)
@@ -168,10 +184,9 @@ else
     [Parameter] public EventCallback<Guid> DetailsClicked { get; set; }
 
     /// <summary>Mevcut sayfadaki satırlar arasında hızlı, client-side arama kutusu gösterir.
-    /// Bu, FilterBarComponent'in sunduğu sunucu taraflı (tüm veri seti üzerinde) kolon bazlı
-    /// filtrelemenin YERİNE değil, ONA EK olarak çalışır — sadece o an ekranda görünen satırları
-    /// süzer. Tüm veri setinde arama için Filtreler panelini kullanın.</summary>
-    [Parameter] public bool ShowSearchBox { get; set; } = true;
+    /// Varsayılan false olarak kapalıdır; kolon bazlı arama ve filtreleme FilterBarComponent
+    /// üzerinden sunucu taraflı yürütülür.</summary>
+    [Parameter] public bool ShowSearchBox { get; set; } = false;
 
     [Parameter] public string SearchPlaceholder { get; set; } = "Search this page...";
 
@@ -244,43 +259,78 @@ else
         }
     }
 
-    /// <summary>Görünen kolona karşılık gelen aktif OrderedColumn'u döner (arrow gösterimi için).</summary>
-    private MetaColumnDTO? GetSortState(MetaColumnDTO column)
-        => Table?.GetOrderedMetaColumnsWithIncludes
-                 .FirstOrDefault(o => o.IsOrdered && o.Name == column.Name && o.TableName == column.TableName);
+    /// <summary>Görünen kolona karşılık gelen OrderedColumn DTO'yu döner (Join/Navigation duyarlı).</summary>
+    private MetaColumnDTO? GetOrderedColumnFor(MetaColumnDTO column)
+    {
+        if (Table == null) return null;
 
+        return Table.GetOrderedMetaColumnsWithIncludes.FirstOrDefault(o =>
+            (column.IsNavigation && o.IsNavigation &&
+             o.NavigationColumnInfoDTO != null && column.NavigationColumnInfoDTO != null &&
+             o.NavigationColumnInfoDTO.LeftTableName == column.NavigationColumnInfoDTO.LeftTableName &&
+             o.NavigationColumnInfoDTO.RightTableName == column.NavigationColumnInfoDTO.RightTableName &&
+             (o.NavigationColumnInfoDTO.NameToDisplay == column.NavigationColumnInfoDTO.NameToDisplay || o.Name == column.Name))
+            ||
+            (!column.IsNavigation && !o.IsNavigation &&
+             o.Name == column.Name && o.TableName == column.TableName));
+    }
+
+    /// <summary>Görünen kolona karşılık gelen aktif (IsOrdered == true) OrderedColumn'u döner.</summary>
+    private MetaColumnDTO? GetSortState(MetaColumnDTO column)
+    {
+        var match = GetOrderedColumnFor(column);
+        return match != null && match.IsOrdered ? match : null;
+    }
+
+    /// <summary>
+    /// GedenLines referanslı 3 durumlu sıralama döngüsü:
+    /// Nötr (Sırasız) -> Ascending (Artan) -> Descending (Azalan) -> Nötr (Sıralamayı Kaldır).
+    /// Tekil kolon sıralaması esastır: bir kolona tıklandığında diğer kolonların sıralaması temizlenir.
+    /// </summary>
     private async Task OnSort(MetaColumnDTO column)
     {
         if (Table == null || !column.IsOrderable)
             return;
 
-        var existingSort = Table.GetOrderedMetaColumnsWithIncludes
-                                .FirstOrDefault(c => c.Name == column.Name && c.TableName == column.TableName);
+        var existingSort = GetOrderedColumnFor(column);
 
-        //Tek kolonlu sıralama: diğer sıralamaları kapat
+        // Tek kolonlu sıralama: diğer tüm kolonların sıralamasını kapat / nötrle
         foreach (var ordered in Table.GetOrderedMetaColumnsWithIncludes)
         {
             if (ordered != existingSort)
                 ordered.IsOrdered = false;
         }
 
-        if (existingSort != null && existingSort.IsOrdered)
+        if (existingSort != null)
         {
-            existingSort.Direction = existingSort.Direction == Hydra.DataModels.SortingDirection.Ascending
-                ? Hydra.DataModels.SortingDirection.Descending
-                : Hydra.DataModels.SortingDirection.Ascending;
-        }
-        else if (existingSort != null)
-        {
-            existingSort.IsOrdered = true;
-            existingSort.Direction = Hydra.DataModels.SortingDirection.Ascending;
+            if (!existingSort.IsOrdered)
+            {
+                // Durum 0 (Nötr) -> Durum 1 (ASC)
+                existingSort.IsOrdered = true;
+                existingSort.Direction = Hydra.DataModels.SortingDirection.Ascending;
+            }
+            else if (existingSort.Direction == Hydra.DataModels.SortingDirection.Ascending)
+            {
+                // Durum 1 (ASC) -> Durum 2 (DESC)
+                existingSort.Direction = Hydra.DataModels.SortingDirection.Descending;
+            }
+            else
+            {
+                // Durum 2 (DESC) -> Durum 0 (Nötr / Reset: sıralamadan kurtulma)
+                existingSort.IsOrdered = false;
+            }
+
+            Table.AlterOrAddMetaColumn(existingSort);
         }
         else
         {
-            var orderColumn = MetaColumnDTO.CreateColumnDTOToOrder(name: column.Name!,
-                                                                   alias: column.Alias,
-                                                                   sortingDirection: Hydra.DataModels.SortingDirection.Ascending);
+            // Tabloda henüz bu kolon için OrderedColumn yok: oluştur ve ASC yap
+            var orderColumn = MetaColumnDTO.CreateColumnDTOToOrder(
+                name: column.Name!,
+                alias: column.Alias,
+                sortingDirection: Hydra.DataModels.SortingDirection.Ascending);
             orderColumn.NavigationColumnInfoDTO = column.NavigationColumnInfoDTO;
+            orderColumn.TableName = column.TableName;
 
             Table.AlterOrAddMetaColumn(orderColumn);
         }

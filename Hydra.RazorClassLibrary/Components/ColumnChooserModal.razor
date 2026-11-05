@@ -201,7 +201,7 @@
 
         // Primary key ve dahili join Id kolonları hariç tüm kolonları listele
         _items = Table.MetaColumns
-            .Where(c => !c.IsPrimaryKey && !c.IsJoinedTableKey)
+            .Where(c => !c.IsPrimaryKey && !c.IsJoinedTableKey && c.IsVisibleInColumnChooser)
             .GroupBy(c => c.Name)
             .Select(g =>
             {
@@ -210,9 +210,9 @@
                 {
                     ColumnName = col.Name,
                     DisplayName = string.IsNullOrWhiteSpace(col.DisplayName) ? col.Name : col.DisplayName,
-                    IsVisibleInGrid = col.TypeName == nameof(SelectedColumn),
-                    IsVisibleInFilterBar = col.FilterDTO != null && col.CreateViewComponentFromThis,
-                    SupportsFilter = col.FilterDTO != null,
+                    IsVisibleInGrid = g.Any(c => c.TypeName == nameof(SelectedColumn)),
+                    IsVisibleInFilterBar = g.Any(c => c.FilterDTO != null && c.CreateViewComponentFromThis),
+                    SupportsFilter = g.Any(c => c.FilterDTO != null && !string.IsNullOrEmpty(c.FilterDTO.TypeName)),
                     MetaColumn = col
                 };
             })
@@ -244,26 +244,19 @@
         foreach (var item in _items)
         {
             var matchingCols = Table.MetaColumns.Where(c => c.Name == item.ColumnName).ToList();
-            foreach (var col in matchingCols)
-            {
-                // Grid görünürlüğü
-                if (item.IsVisibleInGrid)
-                {
-                    if (col.TypeName != nameof(SelectedColumn))
-                        col.TypeName = nameof(SelectedColumn);
-                }
-                else
-                {
-                    // Seçili olmaktan çıkar
-                    if (col.TypeName == nameof(SelectedColumn))
-                        col.TypeName = nameof(MetaColumn);
-                }
 
-                // Filtre barı görünürlüğü
-                if (col.FilterDTO != null)
-                {
-                    col.FilterDTO.CreateFilterComponentFromThis = item.IsVisibleInFilterBar;
-                }
+            // Grid gorunurlugu: Sadece SelectedColumn veya MetaColumn (aday kolon) olan kaydi guncelle.
+            // FilteredColumn veya OrderedColumn olan kayitlarin TypeName ayrismasi korunmalidir!
+            var gridCol = matchingCols.FirstOrDefault(c => c.TypeName == nameof(SelectedColumn) || c.TypeName == nameof(MetaColumn));
+            if (gridCol != null)
+            {
+                gridCol.TypeName = item.IsVisibleInGrid ? nameof(SelectedColumn) : nameof(MetaColumn);
+            }
+
+            // Filtre bari gorunurlugu:
+            foreach (var col in matchingCols.Where(c => c.FilterDTO != null))
+            {
+                col.FilterDTO!.CreateFilterComponentFromThis = item.IsVisibleInFilterBar;
             }
         }
 
@@ -285,7 +278,11 @@
 
     private void ResetToDefaults()
     {
-        OnParametersSet();
+        foreach (var item in _items)
+        {
+            item.IsVisibleInGrid = item.MetaColumn.IsVisibleInListView;
+            item.IsVisibleInFilterBar = item.MetaColumn.IsVisibleInListView && item.SupportsFilter;
+        }
     }
 
     private async Task Close()

@@ -1,4 +1,5 @@
 @using Hydra.DTOs
+@using Hydra.DataModels
 @using Hydra.RazorClassLibrary.Services.Core
 @inject LookupService Lookup
 
@@ -111,6 +112,35 @@ else
                         }
                     </tbody>
                 </table>
+            </div>
+        }
+
+        @if (ActiveFilterFragments.Any())
+        {
+            <div class="hydra-grid__active-filter-panel">
+                <div class="hydra-grid__active-filter-left">
+                    <i class="hydra-icon bi bi-funnel-fill hydra-grid__active-filter-icon"></i>
+                    <span class="hydra-grid__active-filter-text">
+                        @for (int i = 0; i < ActiveFilterFragments.Count; i++)
+                        {
+                            var fragment = ActiveFilterFragments[i];
+                            if (i > 0)
+                            {
+                                <span class="hydra-grid__active-filter-and">AND</span>
+                            }
+                            <span class="hydra-grid__active-filter-field">[@fragment.FieldName]</span>
+                            <span class="hydra-grid__active-filter-op">@fragment.Operator</span>
+                            <span class="hydra-grid__active-filter-val">'@fragment.ValueText'</span>
+                        }
+                    </span>
+                </div>
+                <div class="hydra-grid__active-filter-right">
+                    <button type="button" class="hydra-btn hydra-btn--icon hydra-grid__active-filter-clear"
+                            title="Clear active filters"
+                            @onclick="ClearActiveFilters">
+                        <i class="hydra-icon bi bi-x-lg"></i>
+                    </button>
+                </div>
             </div>
         }
 
@@ -271,6 +301,79 @@ else
         if (Table == null) return;
 
         Table.PageSize = size;
+        Table.PageNumber = 1;
+        await TableChanged.InvokeAsync(Table);
+    }
+
+    public class ActiveFilterFragment
+    {
+        public string FieldName { get; set; } = string.Empty;
+        public string Operator { get; set; } = string.Empty;
+        public string ValueText { get; set; } = string.Empty;
+    }
+
+    private List<ActiveFilterFragment> ActiveFilterFragments
+    {
+        get
+        {
+            var list = new List<ActiveFilterFragment>();
+            if (Table?.MetaColumns == null) return list;
+
+            var filteredCols = Table.GetFilteredMetaColumnsWithIncludes?
+                .Where(c => c.FilterDTO != null && c.FilterDTO.Parameters != null && c.FilterDTO.Parameters.Any(p => p.Value != null && !string.IsNullOrEmpty(p.Value.ToString())))
+                .ToList() ?? new List<MetaColumnDTO>();
+
+            foreach (var col in filteredCols)
+            {
+                var filterType = col.FilterDTO!.TypeName;
+                var paramValues = col.FilterDTO.Parameters
+                    .Where(p => p.Value != null && !string.IsNullOrEmpty(p.Value.ToString()))
+                    .Select(p => p.Value!.ToString())
+                    .ToList();
+
+                if (!paramValues.Any()) continue;
+
+                var fieldName = string.IsNullOrWhiteSpace(col.DisplayName) ? col.Name : col.DisplayName;
+                string op = "equals";
+                string valText = string.Join(" and ", paramValues);
+
+                if (filterType == "ContainsFilter")
+                {
+                    op = "contains";
+                    valText = paramValues[0]!;
+                }
+                else if (filterType == "BetweenFilter")
+                {
+                    op = "between";
+                    valText = paramValues.Count > 1 ? $"{paramValues[0]} and {paramValues[1]}" : paramValues[0]!;
+                }
+                else if (col.ValueType == ColumnValueType.Boolean)
+                {
+                    op = "is";
+                    valText = paramValues[0] == "1" ? "Yes" : "No";
+                }
+
+                list.Add(new ActiveFilterFragment
+                {
+                    FieldName = fieldName,
+                    Operator = op,
+                    ValueText = valText
+                });
+            }
+
+            return list;
+        }
+    }
+
+    private async Task ClearActiveFilters()
+    {
+        if (Table?.MetaColumns == null) return;
+
+        foreach (var col in Table.MetaColumns.Where(c => c.FilterDTO != null))
+        {
+            col.FilterDTO!.ClearParameters();
+        }
+
         Table.PageNumber = 1;
         await TableChanged.InvokeAsync(Table);
     }

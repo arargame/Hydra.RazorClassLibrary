@@ -2,9 +2,10 @@
 @using Hydra.DataModels
 @using Hydra.RazorClassLibrary.ComponentModels
 
-@* DevExpress / Kurumsal DataGrid tarzı Column Chooser & Filter Chooser Modalı.
-   Kullanıcının tabloda görmek istediği sütunları ve filtre barında yer almasını
-   istediği alanları dinamik olarak açıp kapatmasını sağlar. *@
+@* DevExpress / Kurumsal DataGrid tarzı Column Chooser Modalı.
+   Kullanıcının tabloda görmek istediği sütunları dinamik olarak açıp kapatmasını sağlar.
+   Kural: Grid'de olmayan kolon filtre barında da yer almaz. Bir sütun görünür yapıldığında,
+   varsa arama filtresiyle birlikte etkinleşir; kapatıldığında her ikisinden de kaldırılır. *@
 
 @if (IsOpen)
 {
@@ -33,8 +34,7 @@
             <div class="hydra-column-chooser__body">
                 <div class="hydra-column-chooser__table-header">
                     <span class="hydra-column-chooser__col-name">Field / Column</span>
-                    <span class="hydra-column-chooser__col-opt">Show in Grid</span>
-                    <span class="hydra-column-chooser__col-opt">Filter Bar</span>
+                    <span class="hydra-column-chooser__col-opt">Visible</span>
                 </div>
 
                 <div class="hydra-column-chooser__list">
@@ -49,22 +49,8 @@
                             <div class="hydra-column-chooser__checkbox-cell">
                                 <input type="checkbox"
                                        class="hydra-checkbox"
-                                       checked="@item.IsVisibleInGrid"
-                                       @onchange="e => OnGridVisibilityChanged(item, e.Value)" />
-                            </div>
-
-                            <div class="hydra-column-chooser__checkbox-cell">
-                                @if (item.SupportsFilter)
-                                {
-                                    <input type="checkbox"
-                                           class="hydra-checkbox"
-                                           checked="@item.IsVisibleInFilterBar"
-                                           @onchange="e => OnFilterVisibilityChanged(item, e.Value)" />
-                                }
-                                else
-                                {
-                                    <span class="hydra-text-muted">—</span>
-                                }
+                                       checked="@item.IsVisible"
+                                       @onchange="e => OnVisibilityChanged(item, e.Value)" />
                             </div>
                         </div>
                     }
@@ -94,7 +80,7 @@
 
 <style>
     .hydra-column-chooser {
-        max-width: 580px;
+        max-width: 480px;
         width: 100%;
         display: flex;
         flex-direction: column;
@@ -127,7 +113,7 @@
         border-bottom: 1px solid var(--hydra-border, rgba(255,255,255,0.08));
     }
     .hydra-column-chooser__col-name { flex: 1; }
-    .hydra-column-chooser__col-opt { width: 90px; text-align: center; }
+    .hydra-column-chooser__col-opt { width: 70px; text-align: center; }
     .hydra-column-chooser__item {
         display: flex;
         align-items: center;
@@ -152,7 +138,7 @@
         color: var(--hydra-text-muted, #818896);
     }
     .hydra-column-chooser__checkbox-cell {
-        width: 90px;
+        width: 70px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -179,7 +165,7 @@
 
     [Parameter] public EventCallback<string> OnPreferenceSaved { get; set; }
 
-    [Parameter] public string Title { get; set; } = "Customize Columns & Filters";
+    [Parameter] public string Title { get; set; } = "Customize Columns";
     [Parameter] public string SearchPlaceholder { get; set; } = "Search columns...";
 
     private string _searchText = string.Empty;
@@ -189,8 +175,7 @@
     {
         public string ColumnName { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
-        public bool IsVisibleInGrid { get; set; }
-        public bool IsVisibleInFilterBar { get; set; }
+        public bool IsVisible { get; set; }
         public bool SupportsFilter { get; set; }
         public MetaColumnDTO MetaColumn { get; set; } = default!;
     }
@@ -210,8 +195,7 @@
                 {
                     ColumnName = col.Name,
                     DisplayName = string.IsNullOrWhiteSpace(col.DisplayName) ? col.Name : col.DisplayName,
-                    IsVisibleInGrid = g.Any(c => c.TypeName == nameof(SelectedColumn)),
-                    IsVisibleInFilterBar = g.Any(c => c.FilterDTO != null && c.CreateViewComponentFromThis),
+                    IsVisible = g.Any(c => c.TypeName == nameof(SelectedColumn)),
                     SupportsFilter = g.Any(c => c.FilterDTO != null && !string.IsNullOrEmpty(c.FilterDTO.TypeName)),
                     MetaColumn = col
                 };
@@ -225,16 +209,10 @@
         : _items.Where(i => i.DisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
                             i.ColumnName.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
 
-    private void OnGridVisibilityChanged(ColumnChooserItem item, object? checkedValue)
+    private void OnVisibilityChanged(ColumnChooserItem item, object? checkedValue)
     {
         if (checkedValue is bool b)
-            item.IsVisibleInGrid = b;
-    }
-
-    private void OnFilterVisibilityChanged(ColumnChooserItem item, object? checkedValue)
-    {
-        if (checkedValue is bool b)
-            item.IsVisibleInFilterBar = b;
+            item.IsVisible = b;
     }
 
     private async Task ApplyChanges()
@@ -245,29 +223,31 @@
         {
             var matchingCols = Table.MetaColumns.Where(c => c.Name == item.ColumnName).ToList();
 
-            // Grid gorunurlugu: Sadece SelectedColumn veya MetaColumn (aday kolon) olan kaydi guncelle.
-            // FilteredColumn veya OrderedColumn olan kayitlarin TypeName ayrismasi korunmalidir!
+            // 1. Grid görünürlüğü: Sadece SelectedColumn veya MetaColumn (aday kolon) olan kaydı güncelle.
+            // FilteredColumn veya OrderedColumn olan kayıtların TypeName ayrışması korunmalıdır!
             var gridCol = matchingCols.FirstOrDefault(c => c.TypeName == nameof(SelectedColumn) || c.TypeName == nameof(MetaColumn));
             if (gridCol != null)
             {
-                gridCol.TypeName = item.IsVisibleInGrid ? nameof(SelectedColumn) : nameof(MetaColumn);
+                gridCol.TypeName = item.IsVisible ? nameof(SelectedColumn) : nameof(MetaColumn);
             }
 
-            // Filtre bari gorunurlugu:
+            // 2. Filtre barı görünürlüğü:
+            // "Grid'de olmayan filtrede de olamaz": Sütun görünürse ve filtre destekliyorsa Filter Bar'da yer alır,
+            // kapatıldığında Filter Bar'dan da çıkarılır.
             foreach (var col in matchingCols.Where(c => c.FilterDTO != null))
             {
-                col.FilterDTO!.CreateFilterComponentFromThis = item.IsVisibleInFilterBar;
+                col.FilterDTO!.CreateFilterComponentFromThis = item.IsVisible && item.SupportsFilter;
             }
         }
 
         // Değişiklikleri bildir
         await TableChanged.InvokeAsync(Table);
 
-        // Preference JSON üretip bildir
+        // Preference JSON üretip bildir (hem visibleColumns hem filterColumns senkron üretilir)
         var json = System.Text.Json.JsonSerializer.Serialize(new
         {
-            visibleColumns = _items.Where(i => i.IsVisibleInGrid).Select(i => i.ColumnName).ToList(),
-            filterColumns = _items.Where(i => i.IsVisibleInFilterBar).Select(i => i.ColumnName).ToList()
+            visibleColumns = _items.Where(i => i.IsVisible).Select(i => i.ColumnName).ToList(),
+            filterColumns = _items.Where(i => i.IsVisible && i.SupportsFilter).Select(i => i.ColumnName).ToList()
         });
 
         if (OnPreferenceSaved.HasDelegate)
@@ -280,8 +260,7 @@
     {
         foreach (var item in _items)
         {
-            item.IsVisibleInGrid = item.MetaColumn.IsVisibleInListView;
-            item.IsVisibleInFilterBar = item.MetaColumn.IsVisibleInListView && item.SupportsFilter;
+            item.IsVisible = item.MetaColumn.IsVisibleInListView;
         }
     }
 

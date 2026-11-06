@@ -4,6 +4,7 @@
 @using Hydra.RazorClassLibrary.Services.Core
 @using System.Globalization
 @using System.Reflection
+@using System.ComponentModel.DataAnnotations
 
 @* Create + Edit modlarını tek yerden yöneten meta-veri güdümlü form motoru.
    Id verilirse Edit, verilmezse Create modunda çalışır.
@@ -57,8 +58,9 @@ else
                     var prefilled = _prefilledFields.Contains(field.Name!);
                     var isWide = IsWideField(field);
                     var isBool = IsBooleanField(field);
+                    var hasError = TryGetFieldError(field, out var fieldError);
 
-                    <div class="hydra-form__field @(isWide ? "hydra-form__field--wide" : "") @(isBool ? "hydra-form__field--boolean" : "")">
+                    <div class="hydra-form__field @(isWide ? "hydra-form__field--wide" : "") @(isBool ? "hydra-form__field--boolean" : "") @(hasError ? "hydra-form__field--invalid" : "")">
                         <div class="hydra-form__label-row">
                             <label class="hydra-form__label" for="@($"field-{field.Name}")">
                                 @if (prefilled)
@@ -82,6 +84,14 @@ else
                                               ValueChanged="@(v => SetModelValue(field, v))"
                                               Options="@GetOptions(field)"
                                               Disabled="@IsFieldDisabled(field)" />
+
+                        @if (hasError && !string.IsNullOrEmpty(fieldError))
+                        {
+                            <span class="hydra-form__field-error">
+                                <i class="hydra-icon bi bi-exclamation-circle"></i>
+                                <span>@fieldError</span>
+                            </span>
+                        }
                     </div>
                 }
             </div>
@@ -132,6 +142,7 @@ else
     private readonly Dictionary<string, List<DropdownListOption>> _optionsByField = new();
     private readonly Dictionary<string, object?> _rawValues = new();
     private readonly HashSet<string> _prefilledFields = new();
+    private readonly Dictionary<string, string> _fieldErrors = new(StringComparer.OrdinalIgnoreCase);
 
     private bool IsLoading = true;
     private bool IsSaving;
@@ -251,9 +262,9 @@ else
     private static bool IsBooleanField(MetaColumnDTO field)
         => field.HtmlInputType == HtmlInputType.checkbox || field.ValueType == ColumnValueType.Boolean;
 
-    /// <summary>Zorunluluk metadata'da tutulmuyor; entity üzerindeki CLR tipinden çıkarılır.
-    /// Nullable olmayan değer tipleri (Guid, int, DateTime, enum) mutlaka bir değer almak zorundadır.
-    /// bool hariç tutulur — checkbox'ta yıldız göstermek anlamsız olur.</summary>
+    /// <summary>Zorunluluk metadata'da veya entity üzerindeki CLR tipinden ve attribute'lardan çıkarılır.
+    /// [Required] attribute'u olanlar veya nullable olmayan değer tipleri (Guid, int, DateTime, enum)
+    /// mutlaka bir değer almak zorundadır. bool hariç tutulur.</summary>
     private bool IsRequired(MetaColumnDTO field)
     {
         var property = GetProperty(field.Name);
@@ -261,11 +272,30 @@ else
         if (property == null)
             return false;
 
+        if (property.GetCustomAttribute<RequiredAttribute>() != null)
+            return true;
+
         var type = property.PropertyType;
 
         return type.IsValueType
                && Nullable.GetUnderlyingType(type) == null
                && type != typeof(bool);
+    }
+
+    private bool TryGetFieldError(MetaColumnDTO field, out string? error)
+    {
+        if (_fieldErrors.TryGetValue(field.Name!, out error))
+            return true;
+
+        if (field.Name != null && field.Name.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseName = field.Name[..^2];
+            if (_fieldErrors.TryGetValue(baseName, out error))
+                return true;
+        }
+
+        error = null;
+        return false;
     }
 
     private PropertyInfo? GetProperty(string? name)
@@ -290,6 +320,18 @@ else
     private void SetModelValue(MetaColumnDTO field, object? raw)
     {
         SetModelValueCore(field, raw);
+
+        // Kullanıcı alana değer girdiğinde o alana ait hata uyarısını anında temizle
+        if (field.Name != null)
+        {
+            _fieldErrors.Remove(field.Name);
+            if (field.Name.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                _fieldErrors.Remove(field.Name[..^2]);
+
+            if (_fieldErrors.Count == 0 && ErrorMessage == "Please check the required fields.")
+                ErrorMessage = null;
+        }
+
         StateHasChanged();
     }
 
@@ -355,10 +397,65 @@ else
         prop.SetValue(Model, converted);
     }
 
+    private bool ValidateForm()
+    {
+        _fieldErrors.Clear();
+
+        // 1. Model IValidatableObject ise C# kurallarını istemci tarafında da çalıştır (DRY)
+        if (Model is IValidatableObject validatable)
+        {
+            var context = new ValidationContext(Model);
+            var results = validatable.Validate(context);
+            if (results != null)
+            {
+                foreach (var result in results)
+                {
+                    foreach (var memberName in result.MemberNames)
+                    {
+                        if (!_fieldErrors.ContainsKey(memberName))
+                            _fieldErrors[memberName] = result.ErrorMessage ?? "Invalid value.";
+                    }
+                }
+            }
+        }
+
+        // 2. IsRequired işaretli alanlar için boşluk kontrolü (henüz yakalanmamışsa)
+        foreach (var field in Fields)
+        {
+            if (IsRequired(field) && !TryGetFieldError(field, out _))
+            {
+                var val = GetModelValue(field);
+                bool isEmpty = val == null ||
+                               (val is string s && string.IsNullOrWhiteSpace(s)) ||
+                               (val is Guid g && g == Guid.Empty);
+
+                if (isEmpty)
+                {
+                    _fieldErrors[field.Name!] = $"{field.DisplayName} is required.";
+                }
+            }
+        }
+
+        if (_fieldErrors.Count > 0)
+        {
+            ErrorMessage = "Please check the required fields.";
+            return false;
+        }
+
+        return true;
+    }
+
     private async Task Save()
     {
-        IsSaving = true;
         ErrorMessage = null;
+
+        if (!ValidateForm())
+        {
+            StateHasChanged();
+            return;
+        }
+
+        IsSaving = true;
 
         try
         {

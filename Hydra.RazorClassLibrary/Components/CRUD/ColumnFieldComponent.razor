@@ -52,7 +52,8 @@
         {
             <div class="hydra-field">
                 <input class="hydra-input" id="@FieldId" type="@InputTypeName" disabled="@IsDisabled"
-                       placeholder="@Placeholder" value="@FormattedInputValue" @onchange="OnRawChanged" />
+                       placeholder="@Placeholder" value="@FormattedInputValue" @onchange="OnRawChanged"
+                       autocomplete="off" />
                 @if (IsDateLike)
                 {
                     <i class="hydra-icon hydra-field__affix bi bi-calendar3"></i>

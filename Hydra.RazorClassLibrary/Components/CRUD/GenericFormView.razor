@@ -55,8 +55,10 @@ else
                 @foreach (var field in Fields)
                 {
                     var prefilled = _prefilledFields.Contains(field.Name!);
+                    var isWide = IsWideField(field);
+                    var isBool = IsBooleanField(field);
 
-                    <div class="hydra-form__field @(IsWideField(field) ? "hydra-form__field--wide" : "")">
+                    <div class="hydra-form__field @(isWide ? "hydra-form__field--wide" : "") @(isBool ? "hydra-form__field--boolean" : "")">
                         <div class="hydra-form__label-row">
                             <label class="hydra-form__label" for="@($"field-{field.Name}")">
                                 @if (prefilled)
@@ -245,6 +247,9 @@ else
 
     private static bool IsWideField(MetaColumnDTO field)
         => field.HtmlElementType is HtmlElementType.TextArea or HtmlElementType.RichTextEditor;
+
+    private static bool IsBooleanField(MetaColumnDTO field)
+        => field.HtmlInputType == HtmlInputType.checkbox || field.ValueType == ColumnValueType.Boolean;
 
     /// <summary>Zorunluluk metadata'da tutulmuyor; entity üzerindeki CLR tipinden çıkarılır.
     /// Nullable olmayan değer tipleri (Guid, int, DateTime, enum) mutlaka bir değer almak zorundadır.

@@ -383,6 +383,11 @@ else
 
             foreach (var col in filteredCols)
             {
+                // Programmatic parent-child filters (e.g. FK = ParentId) should not be displayed
+                // as interactive removable filter chips for the user.
+                if (col.FilterDTO != null && !col.FilterDTO.CreateFilterComponentFromThis)
+                    continue;
+
                 var filterType = col.FilterDTO!.TypeName;
                 var paramValues = col.FilterDTO.Parameters
                     .Where(p => p.Value != null && !string.IsNullOrEmpty(p.Value.ToString()))
@@ -407,8 +412,22 @@ else
                 }
                 else if (col.ValueType == ColumnValueType.Boolean)
                 {
-                    op = "is";
-                    valText = paramValues[0] == "1" ? "Yes" : "No";
+                    var raw = paramValues[0]?.Trim();
+                    if (raw == "1" || string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        op = "is";
+                        valText = "Yes";
+                    }
+                    else if (raw == "0" || string.Equals(raw, "false", StringComparison.OrdinalIgnoreCase))
+                    {
+                        op = "is";
+                        valText = "No";
+                    }
+                    else
+                    {
+                        op = "equals";
+                        valText = paramValues[0];
+                    }
                 }
 
                 list.Add(new ActiveFilterFragment

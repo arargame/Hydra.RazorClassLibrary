@@ -984,20 +984,153 @@
     gap: 1.5rem;
 }
 
-.hydra-details__pair { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.hydra-details__pair { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
 
 .hydra-details__pair-label {
     font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
     color: var(--hydra-text-muted);
 }
 
 .hydra-details__pair-value {
-    font-size: var(--hydra-font-sm);
+    font-size: 0.9375rem;
+    font-weight: 500;
     color: var(--hydra-text);
     word-break: break-word;
+    display: flex;
+    align-items: center;
+    min-height: 1.5rem;
 }
 
-.hydra-details__link { color: var(--hydra-primary); }
+.hydra-details__link {
+    color: var(--hydra-primary);
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: color 0.15s ease;
+}
+.hydra-details__link:hover {
+    text-decoration: underline;
+    filter: brightness(1.2);
+}
+
+/* Tarih/Saat Görünümü */
+.hydra-details__datetime {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.65rem;
+    background: color-mix(in srgb, var(--hydra-primary) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--hydra-primary) 25%, transparent);
+    border-radius: var(--hydra-radius-sm);
+    color: var(--hydra-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.hydra-details__datetime:hover {
+    background: color-mix(in srgb, var(--hydra-primary) 18%, transparent);
+    border-color: var(--hydra-primary);
+}
+
+/* Id / Guid Kod Hapı */
+.hydra-details__id-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.2rem 0.6rem;
+    background: var(--hydra-bg-subtle);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius-sm);
+    font-family: monospace;
+    font-size: 0.8125rem;
+    color: var(--hydra-text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.hydra-details__id-pill:hover {
+    background: var(--hydra-bg-hover);
+    color: var(--hydra-text);
+    border-color: var(--hydra-primary);
+}
+.hydra-details__copy-icon {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+.hydra-details__datetime:hover .hydra-details__copy-icon,
+.hydra-details__id-pill:hover .hydra-details__copy-icon {
+    opacity: 1;
+}
+
+/* Boolean Değerler (Read-only Checkbox / Durum Rozeti) */
+.hydra-details__bool {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--hydra-radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    user-select: none;
+}
+.hydra-details__bool--true {
+    background: color-mix(in srgb, var(--hydra-create, #10b981) 12%, transparent);
+    color: var(--hydra-create, #10b981);
+    border: 1px solid color-mix(in srgb, var(--hydra-create, #10b981) 30%, transparent);
+}
+.hydra-details__bool--false {
+    background: color-mix(in srgb, var(--hydra-delete, #ef4444) 10%, transparent);
+    color: var(--hydra-delete, #ef4444);
+    border: 1px solid color-mix(in srgb, var(--hydra-delete, #ef4444) 25%, transparent);
+}
+
+/* Uzun Metin Kırpma / Read More */
+.hydra-details__text-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+}
+.hydra-details__read-more-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--hydra-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.hydra-details__read-more-btn:hover {
+    filter: brightness(1.2);
+}
+
+/* Kopyalandı Bildirimi (Toast) */
+.hydra-details__toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--hydra-surface);
+    border: 1px solid var(--hydra-primary);
+    color: var(--hydra-primary);
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--hydra-radius);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    z-index: 9999;
+    animation: hydra-fade-in 0.2s ease;
+}
 
 /* ------------------------------------------------------------ Sekmeler */
 
@@ -1041,7 +1174,7 @@
 /* --------------------------------------------------------- Collection view */
 
 .hydra-collection { display: flex; flex-direction: column; gap: 1rem; }
-.hydra-collection--hidden { display: none; }
+.hydra-collection--hidden { display: none !important; }
 
 /* Tek başına (sekme dışında) kullanıldığında kendi kartını çizer */
 .hydra-collection--standalone {

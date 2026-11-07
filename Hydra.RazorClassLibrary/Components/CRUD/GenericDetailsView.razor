@@ -1,18 +1,22 @@
 @typeparam T where T : class, new()
 @using Hydra.DTOs
+@using Hydra.DataModels
 @using Hydra.RazorClassLibrary.Services.Core
+@using Hydra.RazorClassLibrary.Utils
+@using Microsoft.JSInterop
 @inject LookupService Lookup
+@inject IJSRuntime JSRuntime
 @implements IDetailsTabsHost
 
 @* Meta-veri güdümlü detay (DetailsView) ekranı.
-
    Yapı: başlık kartı (aksiyonlar) → özet kartı (ana property'ler) → sekmeli koleksiyon kartı.
-   Sayfanın verdiği CollectionViewSection'lar kendilerini sekme olarak kaydeder (IDetailsTabsHost).
-   Bunlara ek olarak, EN SONA otomatik bir "Loglar" sekmesi eklenir: Log tablosunda bu kayda ait
-   satırlar (EntityType + EntityId) listelenir. BaseObject ile Log arasında FK yoktur — bağ
-   yalnızca EntityId üzerinden, select ile kurulur. ShowLogsTab ile kapatılabilir.
-
-   TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
+   GedenLines mimarisi referans alınarak:
+   - Özellik etiketleri ve değerleri ayrıştırılmış renk ve tipografi ile sunulur.
+   - Tarih/Saat alanları dostane tarih-saat formatında gösterilir, tıklandığında tam ISO kopyalanır.
+   - Boolean alanlar salt-okunur onay kutusu (disabled checkbox) veya durum rozeti ile sunulur.
+   - Uzun metinler (Description vb.) kırpılarak 'Read more / Show less' ile yönetilir.
+   - Kimlik ve Yabancı Anahtar (FK) alanları doğrudan ilgili nesneye giden tıklanabilir linktir.
+   - Sekme geçişleri reaktif olay mekanizması ile izole edilir; çoklu koleksiyon sızıntısı engellenir. *@
 
 @if (IsLoading)
 {
@@ -61,16 +65,88 @@ else
                 <div class="hydra-details__summary-body">
                     @foreach (var column in DisplayColumns)
                     {
+                        var rawValue = GetRawValue(column);
+                        var isDateTime = DateTimeHelper.IsDateTimeColumn(column);
+                        var isBool = column.ValueType == ColumnValueType.Boolean || column.Name == "IsActive" || column.Name == "IsAssignable";
+                        var isIdColumn = column.Name == "Id" || column.IsPrimaryKey;
+                        var navLink = GetNavigationLink(column);
+
                         <div class="hydra-details__pair">
                             <span class="hydra-details__pair-label">@column.DisplayName</span>
                             <span class="hydra-details__pair-value">
-                                @if (IsNavigationLink(column))
+                                @if (isDateTime)
                                 {
-                                    <a class="hydra-details__link" href="@GetNavigationLink(column)">@GetValue(column)</a>
+                                    var friendlyDate = DateTimeHelper.FormatFriendly(rawValue);
+                                    var fullIso = DateTimeHelper.FormatIsoPrecise(rawValue);
+                                    <span class="hydra-details__datetime" title="Full Timestamp: @fullIso (Click to copy)"
+                                          @onclick="() => CopyToClipboard(fullIso)">
+                                        <i class="hydra-icon bi bi-calendar3"></i>
+                                        <span>@friendlyDate</span>
+                                        <i class="hydra-icon bi bi-copy hydra-details__copy-icon"></i>
+                                    </span>
+                                }
+                                else if (isBool)
+                                {
+                                    var bVal = GetBoolValue(column);
+                                    if (bVal == true)
+                                    {
+                                        <span class="hydra-details__bool hydra-details__bool--true" title="Yes / Enabled (Read-only)">
+                                            <i class="hydra-icon bi bi-check-square-fill"></i>
+                                            <span>Yes</span>
+                                        </span>
+                                    }
+                                    else if (bVal == false)
+                                    {
+                                        <span class="hydra-details__bool hydra-details__bool--false" title="No / Disabled (Read-only)">
+                                            <i class="hydra-icon bi bi-square"></i>
+                                            <span>No</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="hydra-text-muted">—</span>
+                                    }
+                                }
+                                else if (isIdColumn && rawValue != null)
+                                {
+                                    var idStr = rawValue.ToString() ?? string.Empty;
+                                    <span class="hydra-details__id-pill font-mono" title="Click to copy Id: @idStr"
+                                          @onclick="() => CopyToClipboard(idStr)">
+                                        <i class="hydra-icon bi bi-fingerprint"></i>
+                                        <span class="hydra-details__id-text">@idStr</span>
+                                        <i class="hydra-icon bi bi-copy hydra-details__copy-icon"></i>
+                                    </span>
+                                }
+                                else if (navLink != null)
+                                {
+                                    <a class="hydra-details__link" href="@navLink">
+                                        <i class="hydra-icon bi bi-box-arrow-up-right me-1"></i>
+                                        <span>@GetValue(column)</span>
+                                    </a>
                                 }
                                 else
                                 {
-                                    @GetValue(column)
+                                    var textVal = GetValue(column) ?? string.Empty;
+                                    if (textVal.Length > 100 || column.Name == "Description")
+                                    {
+                                        var isExpanded = _expandedColumns.Contains(column.Name!);
+                                        <div class="hydra-details__text-container">
+                                            <span class="hydra-details__text">
+                                                @(isExpanded || textVal.Length <= 100 ? textVal : textVal.Substring(0, 100) + "...")
+                                            </span>
+                                            @if (textVal.Length > 100)
+                                            {
+                                                <button type="button" class="hydra-details__read-more-btn"
+                                                        @onclick="() => ToggleExpand(column.Name!)">
+                                                    @(isExpanded ? "Show less" : "Read more")
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span>@(string.IsNullOrWhiteSpace(textVal) ? "—" : textVal)</span>
+                                    }
                                 }
                             </span>
                         </div>
@@ -78,7 +154,7 @@ else
                 </div>
             }
 
-            <CascadingValue Value="(IDetailsTabsHost)this" IsFixed="true">
+            <CascadingValue Value="(IDetailsTabsHost)this" IsFixed="false">
 
                 @* Sekme şeridi. Sekmeler, alttaki panellerin OnInitialized'ında kaydolur;
                    bu yüzden ilk render'da boş olabilir, kayıt sonrası StateHasChanged ile dolar. *@
@@ -127,6 +203,14 @@ else
         </div>
     </div>
 
+    @if (!string.IsNullOrEmpty(_copiedToast))
+    {
+        <div class="hydra-details__toast" role="status">
+            <i class="hydra-icon bi bi-clipboard-check"></i>
+            <span>@_copiedToast</span>
+        </div>
+    }
+
     <ConfirmDialogComponent @bind-IsOpen="ShowDeleteConfirm"
                             Title="Delete Record"
                             Message="Are you sure you want to delete this record? This action cannot be undone."
@@ -158,6 +242,8 @@ else
 
     private readonly List<TabEntry> _tabs = new();
     private object? _activeTabKey;
+    private readonly HashSet<string> _expandedColumns = new();
+    private string? _copiedToast;
 
     private record TabEntry(object Key, string Title, int Count);
 
@@ -167,7 +253,6 @@ else
         get
         {
             var name = Row?.GetValueByColumnName("Name")?.ToString();
-
             return string.IsNullOrWhiteSpace(name) ? Title : name;
         }
     }
@@ -178,7 +263,6 @@ else
         get
         {
             var raw = Row?.GetValueByColumnName("IsActive")?.ToString();
-
             if (string.IsNullOrWhiteSpace(raw))
                 return null;
 
@@ -190,6 +274,8 @@ else
     }
 
     // ---- IDetailsTabsHost ----
+
+    public event Action? OnActiveTabChanged;
 
     object? IDetailsTabsHost.ActiveTabKey => _activeTabKey;
 
@@ -207,18 +293,24 @@ else
     void IDetailsTabsHost.UpdateTabCount(object key, int count)
     {
         var index = _tabs.FindIndex(t => Equals(t.Key, key));
-
         if (index < 0)
             return;
 
         _tabs[index] = _tabs[index] with { Count = count };
-
         InvokeAsync(StateHasChanged);
     }
 
-    private void SetActiveTab(object key) => _activeTabKey = key;
+    private void SetActiveTab(object key)
+    {
+        if (!Equals(_activeTabKey, key))
+        {
+            _activeTabKey = key;
+            OnActiveTabChanged?.Invoke();
+            StateHasChanged();
+        }
+    }
 
-    // ---- Veri ----
+    // ---- Veri & Helper'lar ----
 
     private List<MetaColumnDTO> DisplayColumns => Table == null
         ? new List<MetaColumnDTO>()
@@ -243,25 +335,73 @@ else
         }
     }
 
+    private object? GetRawValue(MetaColumnDTO column)
+        => Row?.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name);
+
     /// <summary>Ham değeri kolonun metadata'sına göre okunabilir metne çevirir
     /// (enum 0/1/2 → isim, boolean → Evet/Hayır). Bkz. LookupService.GetDisplayText.</summary>
     private string? GetValue(MetaColumnDTO column)
-        => Lookup.GetDisplayText(column, Row?.GetValueByColumnName(column.BelongsToJoins ? column.Alias : column.Name));
+        => Lookup.GetDisplayText(column, GetRawValue(column));
 
-    private bool IsNavigationLink(MetaColumnDTO column)
-        => column.NavigationColumnInfoDTO?.SetAsLink == true && GetNavigationLink(column) != null;
+    private bool? GetBoolValue(MetaColumnDTO column)
+    {
+        var raw = GetRawValue(column)?.ToString();
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        if (bool.TryParse(raw, out var b)) return b;
+        return raw == "1" ? true : raw == "0" ? false : null;
+    }
 
     private string? GetNavigationLink(MetaColumnDTO column)
     {
         var navigation = column.NavigationColumnInfoDTO;
+        if (navigation != null)
+        {
+            // Flatten kolon öneki alias'tan gelir (ör. CreatedByEmployee_Id), rota ise gerçek tablodan (Employee).
+            var rightId = Row?.GetValueByColumnName($"{navigation.EffectiveRightTableAlias}_Id");
+            if (rightId != null)
+                return $"/{navigation.RightTableName}/Details/{rightId}";
+        }
 
-        if (navigation == null)
-            return null;
+        // Otomatik FK algılama (ör. RequestCategoryId -> /RequestCategory/Details/{Guid})
+        if (column.Name != null && column.Name.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && !column.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetController = column.Name[..^2];
+            var val = GetRawValue(column)?.ToString();
+            if (Guid.TryParse(val, out var g) && g != Guid.Empty)
+            {
+                return $"/{targetController}/Details/{g}";
+            }
+        }
 
-        //Flatten kolon öneki alias'tan gelir (ör. CreatedByEmployee_Id), rota ise gerçek tablodan (Employee).
-        var rightId = Row?.GetValueByColumnName($"{navigation.EffectiveRightTableAlias}_Id");
+        return null;
+    }
 
-        return rightId == null ? null : $"/{navigation.RightTableName}/Details/{rightId}";
+    private void ToggleExpand(string columnName)
+    {
+        if (!_expandedColumns.Add(columnName))
+            _expandedColumns.Remove(columnName);
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            _copiedToast = "Copied to clipboard!";
+            StateHasChanged();
+            await Task.Delay(2000);
+            _copiedToast = null;
+            StateHasChanged();
+        }
+        catch
+        {
+            _copiedToast = text;
+            StateHasChanged();
+            await Task.Delay(2000);
+            _copiedToast = null;
+            StateHasChanged();
+        }
     }
 
     private void GoBack() => Navigation.NavigateTo($"/{BasePath}");

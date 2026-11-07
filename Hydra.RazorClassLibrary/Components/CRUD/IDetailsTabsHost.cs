@@ -22,4 +22,7 @@ public interface IDetailsTabsHost
 
     /// <summary>Şu an aktif olan sekmenin key'i.</summary>
     object? ActiveTabKey { get; }
+
+    /// <summary>Aktif sekme değiştiğinde alt bileşenleri (CollectionViewSection) uyaran olay.</summary>
+    event Action? OnActiveTabChanged;
 }

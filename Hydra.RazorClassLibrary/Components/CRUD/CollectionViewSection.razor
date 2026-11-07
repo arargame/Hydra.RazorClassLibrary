@@ -3,6 +3,7 @@
 @using Hydra.RazorClassLibrary.Services.Http
 @using Hydra.RazorClassLibrary.Components.Grids
 @inject NavigationManager Navigation
+@implements IDisposable
 
 @* Master-detail ekranlarında, üst kaydın alt kayıtlarını listeler.
    Örn: RequestCategory detayında o kategoriye ait Request'ler.
@@ -16,7 +17,8 @@
 
    TEMA NOTU: CSS framework'süz, sadece anlamsal "hydra-*" class'ları basar (bkz. HydraGrid). *@
 
-<div class="hydra-collection @(IsActiveTab ? "" : "hydra-collection--hidden") @(TabsHost == null ? "hydra-collection--standalone" : "")">
+<div class="hydra-collection @(IsActiveTab ? "" : "hydra-collection--hidden") @(TabsHost == null ? "hydra-collection--standalone" : "")"
+     style="@(IsActiveTab ? "" : "display: none !important;")">
 
     <div class="hydra-collection__header">
         <h3 class="hydra-collection__title">
@@ -231,8 +233,12 @@
     {
         Title ??= Controller;
 
-        //Sekme olarak kaydol — host yoksa (TabsHost null) hiçbir şey yapmaz.
-        TabsHost?.RegisterTab(this, Title);
+        //Sekme olarak kaydol ve aktif sekme değişimini dinle
+        if (TabsHost != null)
+        {
+            TabsHost.RegisterTab(this, Title);
+            TabsHost.OnActiveTabChanged += HandleActiveTabChanged;
+        }
 
         await LoadAsync();
     }
@@ -321,5 +327,17 @@
     {
         Table = updated;
         await LoadAsync();
+    }
+    private void HandleActiveTabChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (TabsHost != null)
+        {
+            TabsHost.OnActiveTabChanged -= HandleActiveTabChanged;
+        }
     }
 }

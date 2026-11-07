@@ -2,6 +2,7 @@
 @using Hydra.DTOs
 @using Hydra.DataModels
 @using Hydra.RazorClassLibrary.Services.Core
+@using Hydra.RazorClassLibrary.Services.Status
 @using System.Globalization
 @using System.Reflection
 @using System.ComponentModel.DataAnnotations
@@ -120,6 +121,7 @@ else
 @code {
     [Inject] public NavigationManager Navigation { get; set; } = default!;
     [Inject] public LookupService Lookup { get; set; } = default!;
+    [Inject] public HydraStatusNotifier? StatusNotifier { get; set; }
 
     [Parameter, EditorRequired] public ApiClient<T> Client { get; set; } = default!;
 
@@ -459,6 +461,8 @@ else
 
         try
         {
+            var saveStartedAt = DateTime.Now;
+
             var result = IsEditMode
                             ? await Client.UpdateAsync(Model)
                             : await Client.CreateAsync(Model);
@@ -470,7 +474,21 @@ else
             }
             else
             {
-                ErrorMessage = "Save failed. Please check the required fields.";
+                if (StatusNotifier?.Last != null &&
+                    StatusNotifier.Last.OccurredAt >= saveStartedAt.AddSeconds(-2) &&
+                    StatusNotifier.Last.Messages.Any())
+                {
+                    ErrorMessage = string.Join(" ", StatusNotifier.Last.Messages);
+                }
+                else if (StatusNotifier?.Last?.Definition?.UserMessage != null &&
+                         StatusNotifier.Last.OccurredAt >= saveStartedAt.AddSeconds(-2))
+                {
+                    ErrorMessage = StatusNotifier.Last.Definition.UserMessage;
+                }
+                else
+                {
+                    ErrorMessage = "Save failed. Please check the required fields.";
+                }
             }
         }
         catch (Exception ex)

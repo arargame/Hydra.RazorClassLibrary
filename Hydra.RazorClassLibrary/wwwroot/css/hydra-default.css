@@ -474,6 +474,94 @@
     color: var(--hydra-text-muted);
 }
 
+/* Başarı bandı */
+.hydra-form__banner--success {
+    border-bottom: 1px solid var(--hydra-create, #10b981) !important;
+    background: color-mix(in srgb, var(--hydra-create, #10b981) 12%, transparent) !important;
+}
+.hydra-form__banner--success .hydra-form__banner-icon,
+.hydra-form__banner--success .hydra-form__banner-title {
+    color: var(--hydra-create, #10b981) !important;
+}
+
+/* Kutlama / Başarı Ekranı */
+.hydra-form__celebration {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3.5rem 2rem;
+    background: var(--hydra-bg-surface);
+    border: 1px solid var(--hydra-border);
+    border-radius: var(--hydra-radius-lg);
+    box-shadow: var(--hydra-shadow);
+    margin: 1.5rem auto;
+    max-width: 600px;
+    animation: hydra-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hydra-form__celebration-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--hydra-create, #10b981) 15%, transparent);
+    border: 2px solid color-mix(in srgb, var(--hydra-create, #10b981) 40%, transparent);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 0 24px color-mix(in srgb, var(--hydra-create, #10b981) 25%, transparent);
+}
+
+.hydra-form__celebration-icon {
+    font-size: 2.75rem;
+    color: var(--hydra-create, #10b981);
+}
+
+.hydra-form__celebration-title {
+    font-size: 1.625rem;
+    font-weight: 700;
+    color: var(--hydra-text);
+    margin: 0 0 0.5rem;
+}
+
+.hydra-form__celebration-text {
+    font-size: var(--hydra-font-base);
+    color: var(--hydra-text-muted);
+    margin: 0 0 2rem;
+    max-width: 440px;
+}
+
+.hydra-form__celebration-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.hydra-form__celebration-countdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--hydra-text-muted);
+    background: var(--hydra-bg-subtle);
+    padding: 0.4rem 0.85rem;
+    border-radius: 20px;
+    border: 1px solid var(--hydra-border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.hydra-form__celebration-countdown:hover {
+    background: var(--hydra-bg-hover);
+    color: var(--hydra-text);
+    border-color: var(--hydra-text-muted);
+}
+
 /* Hata bandı — kaydetme başarısız olduğunda formun üstünde belirir */
 .hydra-form__banner {
     display: flex;

@@ -6,6 +6,7 @@
 @using System.Globalization
 @using System.Reflection
 @using System.ComponentModel.DataAnnotations
+@implements IDisposable
 
 @* Create + Edit modlarını tek yerden yöneten meta-veri güdümlü form motoru.
    Id verilirse Edit, verilmezse Create modunda çalışır.
@@ -22,6 +23,62 @@
 else if (Table == null)
 {
     <div class="hydra-form__alert">Form metadata could not be loaded.</div>
+}
+else if (IsSavedSuccess)
+{
+    <div class="hydra-form hydra-form--celebration">
+        <div class="hydra-form__celebration" role="status">
+            <div class="hydra-form__celebration-icon-wrapper">
+                <i class="hydra-icon bi bi-check2-circle hydra-form__celebration-icon"></i>
+            </div>
+            <h2 class="hydra-form__celebration-title">
+                @(IsEditMode ? "Changes Saved Successfully!" : "Record Created Successfully!")
+            </h2>
+            <p class="hydra-form__celebration-text">
+                @(IsEditMode
+                    ? $"The changes to {Client.Controller} have been saved successfully."
+                    : $"New {Client.Controller} record has been created successfully.")
+            </p>
+
+            <div class="hydra-form__celebration-actions">
+                @if (SavedEntityId.HasValue && SavedEntityId.Value != Guid.Empty)
+                {
+                    <button type="button" class="hydra-btn hydra-btn--primary" @onclick="GoToDetails">
+                        <i class="hydra-icon bi bi-eye"></i>
+                        <span>View Details</span>
+                    </button>
+                }
+
+                <button type="button" class="hydra-btn hydra-btn--create" @onclick="GoToList">
+                    <i class="hydra-icon bi bi-list-ul"></i>
+                    <span>Back to List</span>
+                </button>
+
+                @if (!IsEditMode)
+                {
+                    <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="CreateAnother">
+                        <i class="hydra-icon bi bi-plus-lg"></i>
+                        <span>Create Another</span>
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="hydra-btn hydra-btn--ghost" @onclick="ContinueEditing">
+                        <i class="hydra-icon bi bi-pencil"></i>
+                        <span>Continue Editing</span>
+                    </button>
+                }
+            </div>
+
+            @if (CountdownSeconds.HasValue && CountdownSeconds.Value > 0)
+            {
+                <div class="hydra-form__celebration-countdown" @onclick="CancelCountdown" title="Click to stay on this screen">
+                    <i class="hydra-icon bi bi-clock"></i>
+                    <span>Redirecting to list in @(CountdownSeconds)s... (click to cancel)</span>
+                </div>
+            }
+        </div>
+    </div>
 }
 else
 {
@@ -157,6 +214,7 @@ else
     [Parameter] public string? BasePath { get; set; }
     [Parameter] public EventCallback<T> OnSaved { get; set; }
     [Parameter] public bool StayOnPageAfterSave { get; set; } = false;
+    [Parameter] public int AutoRedirectDelaySeconds { get; set; } = 5;
 
     private bool IsEditMode => Id.HasValue;
 
@@ -172,6 +230,10 @@ else
     private bool IsSaving;
     private string? ErrorMessage;
     private string? SuccessMessage;
+    private bool IsSavedSuccess;
+    private Guid? SavedEntityId;
+    private int? CountdownSeconds;
+    private CancellationTokenSource? _countdownCts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -500,14 +562,13 @@ else
             {
                 await OnSaved.InvokeAsync(result);
 
-                if (StayOnPageAfterSave)
+                SavedEntityId = GetSavedId(result);
+                IsSavedSuccess = true;
+                ErrorMessage = null;
+
+                if (AutoRedirectDelaySeconds > 0 && !StayOnPageAfterSave)
                 {
-                    SuccessMessage = IsEditMode ? "Changes saved successfully." : "Record created successfully.";
-                    ErrorMessage = null;
-                }
-                else
-                {
-                    Navigation.NavigateTo($"/{BasePath}");
+                    StartCountdown(AutoRedirectDelaySeconds);
                 }
             }
             else
@@ -540,4 +601,106 @@ else
     }
 
     private void GoBack() => Navigation.NavigateTo($"/{BasePath}");
+
+    private Guid? GetSavedId(T? item)
+    {
+        if (item == null) return Id;
+
+        var prop = item.GetType().GetProperty("Id", BindingFlags.Public | BindingFlags.Instance);
+        if (prop != null)
+        {
+            var val = prop.GetValue(item);
+            if (val is Guid g && g != Guid.Empty)
+                return g;
+        }
+
+        return Id;
+    }
+
+    private void GoToDetails()
+    {
+        DisposeCountdown();
+        if (SavedEntityId.HasValue && SavedEntityId.Value != Guid.Empty)
+        {
+            Navigation.NavigateTo($"/{BasePath}/Details/{SavedEntityId.Value}");
+        }
+        else
+        {
+            Navigation.NavigateTo($"/{BasePath}");
+        }
+    }
+
+    private void GoToList()
+    {
+        DisposeCountdown();
+        Navigation.NavigateTo($"/{BasePath}");
+    }
+
+    private async Task CreateAnother()
+    {
+        DisposeCountdown();
+        IsSavedSuccess = false;
+        SavedEntityId = null;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        _fieldErrors.Clear();
+        Model = new T();
+        ApplyDefaultValues();
+        ApplyQueryStringPrefills();
+        await ResolveOptionsAsync();
+        StateHasChanged();
+    }
+
+    private void ContinueEditing()
+    {
+        DisposeCountdown();
+        IsSavedSuccess = false;
+        StateHasChanged();
+    }
+
+    private void CancelCountdown()
+    {
+        DisposeCountdown();
+        CountdownSeconds = null;
+        StateHasChanged();
+    }
+
+    private async void StartCountdown(int seconds)
+    {
+        DisposeCountdown();
+        _countdownCts = new CancellationTokenSource();
+        var token = _countdownCts.Token;
+        CountdownSeconds = seconds;
+        StateHasChanged();
+
+        try
+        {
+            while (CountdownSeconds > 0 && !token.IsCancellationRequested)
+            {
+                await Task.Delay(1000, token);
+                CountdownSeconds--;
+                await InvokeAsync(StateHasChanged);
+            }
+
+            if (!token.IsCancellationRequested && IsSavedSuccess)
+            {
+                await InvokeAsync(GoToList);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void DisposeCountdown()
+    {
+        _countdownCts?.Cancel();
+        _countdownCts?.Dispose();
+        _countdownCts = null;
+    }
+
+    public void Dispose()
+    {
+        DisposeCountdown();
+    }
 }
